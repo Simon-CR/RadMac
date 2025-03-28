@@ -20,7 +20,13 @@
                     <td><input type="text" id="mac_address-{{ user.mac_address }}" value="{{ user.mac_address }}"></td>
                     <td><input type="text" id="description-{{ user.mac_address }}" value="{{ user.description }}"></td>
                     <td>
-                        <input type="text" id="vlan_id-{{ user.mac_address }}" value="{{ user.vlan_id }}">
+                        <select id="vlan_id-{{ user.mac_address }}">
+                            {% for group in groups %}
+                                <option value="{{ group.groupname }}" {% if user.vlan_id == group.groupname %} selected {% endif %}>
+                                    {{ group.groupname }}
+                                </option>
+                            {% endfor %}
+                        </select>
                     </td>
                     <td>
                         <button onclick="updateUser('{{ user.mac_address }}')">✅</button>
@@ -120,14 +126,14 @@
         function updateUser(mac_address) {
             const description = document.getElementById('description-' + mac_address).value;
             const vlan_id = document.getElementById('vlan_id-' + mac_address).value;
-            const mac_address_input = document.getElementById('mac_address-' + mac_address).value;
+            const mac_address_input = document.getElementById('mac_address-' + mac_address).value; //added
 
             fetch('/update_user', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: `mac_address=${mac_address}&description=${description}&vlan_id=${vlan_id}&new_mac_address=${mac_address_input}`
+                body: `mac_address=${mac_address}&description=${description}&vlan_id=${vlan_id}&new_mac_address=${mac_address_input}` //added new param
             })
             .then(response => response.text())
             .then(data => {
@@ -150,6 +156,8 @@
                 sessionStorage.removeItem('scrollPosition');
             }
         }
+
+
 
         function duplicateUser(mac_address) {
             fetch('/duplicate_user', {
@@ -185,6 +193,8 @@
                             </td>
                         </tr>`;
 
+
+
                     newTable += `<tr>
                     <td colspan="3" class="merged-cell">
                         <button onclick="addDuplicatedUserRow(this)">➕</button>
@@ -206,11 +216,12 @@
 
         function saveDuplicatedUser() {
             let rows = document.querySelectorAll('#duplicate-dialog-content table tbody tr');
-            let new_mac_address = rows[0].querySelector('#new-mac').value;
+            let new_mac_address = rows[0].querySelector('#new-mac').value; //changed
             let attributes = [];
             for (let i = 1; i < rows.length - 1; i++) {
                 const descriptionInput = rows[i].querySelector(`.new-description`);
                 const vlanIdInput = rows[i].querySelector(`.new-vlan_id`);
+
 
                 if (descriptionInput && vlanIdInput) {
                     attributes.push({
@@ -218,6 +229,7 @@
                         vlan_id: vlanIdInput.value,
                     });
                 } else {
+
                     console.warn(`Input elements not found for row ${i}`);
                     return;
                 }
@@ -228,7 +240,7 @@
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ mac_address: new_mac_address, attributes: attributes })
+                body: JSON.stringify({ mac_address: new_mac_address, attributes: attributes }) //changed
             })
                 .then(response => response.text())
                 .then(data => {
@@ -242,13 +254,17 @@
         }
 
         function addDuplicatedUserRow(button) {
-            const table = button.parentNode.parentNode.parentNode;
+            const table = button.parentNode.parentNode.parentNode; //get the table
             const newRow = table.insertRow(table.rows.length - 1);
+
+
 
             const cell1 = newRow.insertCell(0);
             const cell2 = newRow.insertCell(1);
             const cell3 = newRow.insertCell(2);
             const cell4 = newRow.insertCell(3);
+
+
 
             cell1.classList.add('merged-cell');
             cell2.innerHTML = `<input type="text" class="new-description" value="">`;
@@ -271,7 +287,7 @@
             document.getElementById('add-user-dialog').showModal();
         }
 
-        document.getElementById('close-add-user-dialog').addEventListener('click', () => {
+        document.getElementById('cancel-add-user-dialog').addEventListener('click', () => {
             document.getElementById('add-user-dialog').close();
         });
 
@@ -279,7 +295,7 @@
             saveNewUser();
         });
 
-        function saveNewUser() {
+       function saveNewUser() {
             const mac = document.getElementById('new-mac').value;
             const description = document.getElementById('new-description').value;
             const vlan_id = document.getElementById('new-vlan_id').value;
@@ -291,38 +307,41 @@
 
             // Construct the data as an object
             const userData = {
+                username: mac, // Use MAC as username
+                password: mac, // Use MAC as password
                 mac_address: mac,
                 description: description,
                 vlan_id: vlan_id
             };
 
-            fetch('/add_user', {
+            fetch('/add_user', {  // Make sure this URL is correct
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Content-Type': 'application/json', // Set the content type to JSON
                 },
-                body: JSON.stringify(userData),
+                body: JSON.stringify(userData), // Send the data as a JSON string
             })
             .then(response => {
                 if (!response.ok) {
+                    // Handle HTTP errors (e.g., 400, 500)
                     return response.text().then(text => {
                         throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
                     });
                 }
-                return response.json();
+                return response.json(); // Expect JSON response from server
             })
             .then(data => {
                 console.log("Server response:", data);
-                if (data && data.success) {
+                if (data && data.success) { // Check for success property in JSON response
                     document.getElementById('add-user-dialog').close();
                     location.reload();
                 } else {
-                    alert('Error adding user: ' + (data && data.message ? data.message : 'Unknown error'));
+                    alert('Error adding user: ' + (data && data.message ? data.message : 'Unknown error')); // Show error from server or a generic message
                 }
             })
             .catch(error => {
-                console.error('Fetch error:', error);
-                alert('Error adding user: ' + error.message);
+                console.error('Fetch error:', error); // Log the error for debugging
+                alert('Error adding user: ' + error.message); // Show a user-friendly error message
             });
         }
     </script>
