@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block title %}FreeRADIUS Manager{% endblock %}
+
+{% block content %}
+    <h1>FreeRADIUS Manager</h1>
+
+    <h2>Statistics:</h2>
+    <p>Total Users: {{ total_users }}</p>
+    <p>Total Groups: {{ total_groups }}</p>
+
+    <h2>SQL Query Tool:</h2>
+    <form method="POST" action="/sql">
+        <textarea name="query" rows="5" cols="50"></textarea><br>
+        <button type="submit">Execute Query</button>
+    </form>
+
+    {% if sql_results %}
+        <h2>Query Results:</h2>
+        <table border="1">
+            <thead>
+                <tr>
+                    {% for key in sql_results[0].keys() %}
+                        <th>{{ key }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in sql_results %}
+                    <tr>
+                        {% for value in row.values() %}
+                            <td>{{ value }}</td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    {% if sql_error %}
+        <p style="color: red;">{{ sql_error }}</p>
+    {% endif %}
+{% endblock %}

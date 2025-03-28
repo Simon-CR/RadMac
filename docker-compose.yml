@@ -1,4 +1,4 @@
-version: '3.8'
+---
 
 services:
   app:
@@ -10,8 +10,7 @@ services:
     environment:
       - FLASK_APP=app.py
       - FLASK_ENV=development
-    depends_on:
-      - db
+
   nginx:
     build:
       context: ./nginx
@@ -20,12 +19,3 @@ services:
       - "8080:80"
     depends_on:
       - app
-  db:
-    image: mariadb:10.6
-    environment:
-      MYSQL_ROOT_PASSWORD: your_root_password
-      MYSQL_DATABASE: radius
-      MYSQL_USER: radiususer
-      MYSQL_PASSWORD: radiuspassword
-    volumes:
-      - ./db-data:/var/lib/mysql # persistant data.

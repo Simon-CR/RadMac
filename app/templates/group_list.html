@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Group List</title>
+</head>
+<body>
+    <h1>Group List</h1>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Group Name</th>
+                <th>Attribute</th>
+                <th>Op</th>
+                <th>Value</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for group in results %}
+                <tr>
+                    <td>{{ group.id }}</td>
+                    <td>{{ group.groupname }}</td>
+                    <td>{{ group.attribute }}</td>
+                    <td>{{ group.op }}</td>
+                    <td>{{ group.value }}</td>
+                    <td>
+                        <a href="/edit_group/{{ group.id }}">Edit</a> |
+                        <a href="/delete_group/{{ group.id }}">Delete</a>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</body>
+</html>

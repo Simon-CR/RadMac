@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit User</title>
+</head>
+<body>
+    <h1>Edit User: {{ user.mac_address }}</h1>
+
+    <form method="POST">
+        <label for="description">Description:</label><br>
+        <input type="text" id="description" name="description" value="{{ user.description }}"><br><br>
+
+        <label for="vlan_id">VLAN ID:</label><br>
+        <input type="text" id="vlan_id" name="vlan_id" value="{{ user.vlan_id }}"><br><br>
+
+        <input type="submit" value="Save Changes">
+    </form>
+
+</body>
+</html>

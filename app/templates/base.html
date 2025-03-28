@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{% block title %}{% endblock %}</title>
+    <style>
+        nav {
+            background-color: #f0f0f0;
+            padding: 10px;
+        }
+
+        nav a {
+            margin-right: 10px;
+            text-decoration: none;
+            padding: 5px 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        nav a.active {
+            background-color: #ddd;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/" {% if request.path == '/' %}class="active"{% endif %}>Home</a>
+        <a href="/user_list" {% if request.path == '/user_list' %}class="active"{% endif %}>User List</a>
+        <a href="/groups" {% if request.path == '/groups' %}class="active"{% endif %}>Group List</a>
+    </nav>
+
+    <div class="content">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

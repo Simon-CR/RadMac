@@ -1,0 +1,316 @@
+{% extends 'base.html' %}
+
+{% block title %}User List{% endblock %}
+
+{% block content %}
+    <h1>User List</h1>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th>MAC Address</th>
+                <th>Description</th>
+                <th>VLAN ID</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in results %}
+                <tr>
+                    <td><input type="text" id="mac_address-{{ user.mac_address }}" value="{{ user.mac_address }}"></td>
+                    <td><input type="text" id="description-{{ user.mac_address }}" value="{{ user.description }}"></td>
+                    <td><input type="text" id="vlan_id-{{ user.mac_address }}" value="{{ user.vlan_id }}"></td>
+                    <td>
+                        <button onclick="updateUser('{{ user.mac_address }}')">✅</button>
+                        <button onclick="location.reload()">❌</button>
+                        <a href="/delete_user/{{ user.mac_address }}" onclick="saveScrollPosition()">🗑️</a>
+                        <button onclick="duplicateUser('{{ user.mac_address }}')">Duplicate</button>
+                    </td>
+                </tr>
+            {% endfor %}
+            <tr>
+                <td colspan="4">
+                    <button onclick="addNewUserRow()">➕ Add User</button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <dialog id="add-user-dialog">
+        <div id="add-user-dialog-content">
+            <table border="1">
+                <thead>
+                    <tr>
+                        <th>MAC Address</th>
+                        <th>Description</th>
+                        <th>VLAN ID</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><input type="text" id="new-mac"></td>
+                        <td><input type="text" id="new-description"></td>
+                        <td><input type="text" id="new-vlan_id"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
+            <button id="cancel-add-user-dialog">Cancel</button>
+            <button id="save-new-user">Save</button>
+        </div>
+    </dialog>
+
+    <dialog id="duplicate-dialog">
+        <div id="duplicate-dialog-content"></div>
+        <button id="close-dialog">❌</button>
+        <button id="save-duplicated-user">Save</button>
+    </dialog>
+
+    <style>
+        .merged-cell {
+            border: none;
+        }
+
+        #cancel-add-user-dialog {
+            border-radius: 5px;
+            padding: 10px;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        #cancel-add-user-dialog:hover {
+            background-color: #d32f2f;
+        }
+
+        #save-new-user {
+            border-radius: 5px;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        #save-new-user:hover {
+            background-color: #45a049;
+        }
+
+        #add-user-dialog-content + div {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 10px;
+        }
+    </style>
+
+    <script>
+        function updateUser(mac_address) {
+            const description = document.getElementById('description-' + mac_address).value;
+            const vlan_id = document.getElementById('vlan_id-' + mac_address).value;
+            const mac_address_input = document.getElementById('mac_address-' + mac_address).value; //added
+
+            fetch('/update_user', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `mac_address=${mac_address}&description=${description}&vlan_id=${vlan_id}&new_mac_address=${mac_address_input}` //added new param
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === 'success') {
+                    location.reload();
+                } else {
+                    alert('Error updating user: ' + data);
+                }
+            });
+        }
+
+        function saveScrollPosition() {
+            sessionStorage.setItem('scrollPosition', window.scrollY);
+        }
+
+        window.onload = function () {
+            const scrollPosition = sessionStorage.getItem('scrollPosition');
+            if (scrollPosition) {
+                window.scrollTo(0, scrollPosition);
+                sessionStorage.removeItem('scrollPosition');
+            }
+        }
+
+
+
+        function duplicateUser(mac_address) {
+            fetch('/duplicate_user', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `mac_address=${mac_address}`
+            })
+                .then(response => response.json())
+                .then(data => {
+                    const userData = data;
+                    let newTable = `<table border="1">
+                    <thead>
+                        <tr>
+                            <th>MAC Address</th>
+                            <th>Description</th>
+                            <th>VLAN ID</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><input type="text" id="new-mac" value="${userData.mac_address}"></td>
+                            <td><input type="text" class="new-description" value="${userData.description}"></td>
+                            <td><input type="text" class="new-vlan_id" value="${userData.vlan_id}"></td>
+                        </tr>`;
+
+
+
+                    newTable += `<tr>
+                    <td colspan="3" class="merged-cell">
+                        <button onclick="addDuplicatedUserRow(this)">➕</button>
+                    </td>
+                </tr></tbody></table>`;
+
+                    document.getElementById('duplicate-dialog-content').innerHTML = newTable;
+                    document.getElementById('duplicate-dialog').showModal();
+                });
+        }
+
+        document.getElementById('close-dialog').addEventListener('click', () => {
+            document.getElementById('duplicate-dialog').close();
+        });
+
+        document.getElementById('save-duplicated-user').addEventListener('click', () => {
+            saveDuplicatedUser();
+        });
+
+        function saveDuplicatedUser() {
+            let rows = document.querySelectorAll('#duplicate-dialog-content table tbody tr');
+            let new_mac_address = rows[0].querySelector('#new-mac').value; //changed
+            let attributes = [];
+            for (let i = 1; i < rows.length - 1; i++) {
+                const descriptionInput = rows[i].querySelector(`.new-description`);
+                const vlanIdInput = rows[i].querySelector(`.new-vlan_id`);
+
+
+                if (descriptionInput && vlanIdInput) {
+                    attributes.push({
+                        description: descriptionInput.value,
+                        vlan_id: vlanIdInput.value,
+                    });
+                } else {
+
+                    console.warn(`Input elements not found for row ${i}`);
+                    return;
+                }
+            }
+
+            fetch('/save_duplicated_user', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ mac_address: new_mac_address, attributes: attributes }) //changed
+            })
+                .then(response => response.text())
+                .then(data => {
+                    if (data === 'success') {
+                        document.getElementById('duplicate-dialog').close();
+                        location.reload();
+                    } else {
+                        alert('Error saving duplicated user: ' + data);
+                    }
+                });
+        }
+
+        function addDuplicatedUserRow(button) {
+            const table = button.parentNode.parentNode.parentNode; //get the table
+            const newRow = table.insertRow(table.rows.length - 1);
+
+
+
+            const cell1 = newRow.insertCell(0);
+            const cell2 = newRow.insertCell(1);
+            const cell3 = newRow.insertCell(2);
+            const cell4 = newRow.insertCell(3);
+
+
+
+            cell1.classList.add('merged-cell');
+            cell2.innerHTML = `<input type="text" class="new-description" value="">`;
+            cell3.innerHTML = `<input type="text" class="new-vlan_id" value="">`;
+            cell4.innerHTML = `<button onclick="removeDuplicatedUserRow(this)">🗑️</button>`;
+        }
+
+        function removeDuplicatedUserRow(button) {
+            const row = button.parentNode.parentNode;
+            row.parentNode.removeChild(row);
+        }
+
+        function addNewUserRow() {
+            document.getElementById('add-user-dialog').showModal();
+        }
+
+        document.getElementById('close-add-user-dialog').addEventListener('click', () => {
+            document.getElementById('add-user-dialog').close();
+        });
+
+        document.getElementById('save-new-user').addEventListener('click', () => {
+            saveNewUser();
+        });
+
+       function saveNewUser() {
+            const mac = document.getElementById('new-mac').value;
+            const description = document.getElementById('new-description').value;
+            const vlan_id = document.getElementById('new-vlan_id').value;
+
+            if (!mac) {
+                alert('MAC Address cannot be empty.');
+                return;
+            }
+
+            // Construct the data as an object
+            const userData = {
+                mac_address: mac,
+                description: description,
+                vlan_id: vlan_id
+            };
+
+            fetch('/add_user', {  // Make sure this URL is correct
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json', // Set the content type to JSON
+                },
+                body: JSON.stringify(userData), // Send the data as a JSON string
+            })
+            .then(response => {
+                if (!response.ok) {
+                    // Handle HTTP errors (e.g., 400, 500)
+                    return response.text().then(text => {
+                        throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
+                    });
+                }
+                return response.json(); // Expect JSON response from server
+            })
+            .then(data => {
+                console.log("Server response:", data);
+                if (data && data.success) { // Check for success property in JSON response
+                    document.getElementById('add-user-dialog').close();
+                    location.reload();
+                } else {
+                    alert('Error adding user: ' + (data && data.message ? data.message : 'Unknown error')); // Show error from server or a generic message
+                }
+            })
+            .catch(error => {
+                console.error('Fetch error:', error); // Log the error for debugging
+                alert('Error adding user: ' + error.message); // Show a user-friendly error message
+            });
+        }
+    </script>
+{% endblock %}

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add User</title>
+</head>
+<body>
+    <h1>Add User</h1>
+    <form method="POST">
+        <label for="mac_address">MAC Address:</label>
+        <input type="text" name="mac_address" required><br><br>
+        <label for="vlan_id">VLAN ID:</label>
+        <input type="text" name="vlan_id" required><br><br>
+        <label for="description">Description:</label>
+        <input type="text" name="description"><br><br>
+        <input type="submit" value="Add User">
+    </form>
+    <a href="{{ url_for('user_list') }}">Back to User List</a>
+</body>
+</html>

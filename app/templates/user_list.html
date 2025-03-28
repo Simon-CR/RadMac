@@ -1,0 +1,364 @@
+{% extends 'base.html' %}
+
+{% block title %}User List{% endblock %}
+
+{% block content %}
+    <h1>User List</h1>
+
+    {% for username, attributes in grouped_users.items() %}
+        <table border="1">
+            <thead>
+                <tr>
+                    <th>User Name</th>
+                    <th>Attributes</th>
+                    <th>Op</th>
+                    <th>Value</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <input type="text" id="username-{{ username }}" value="{{ username }}">
+                    </td>
+                    <td colspan="3" class="merged-cell">
+                        <button onclick="addUserRow('{{ username }}')">➕</button>
+                    </td>
+                    <td>
+                        <button onclick="updateUserName('{{ username }}')">✅ Rename User</button>
+                        <button onclick="location.reload()">❌</button>
+                        <a href="/delete_user_rows/{{ username }}" onclick="saveScrollPosition()">🗑️</a>
+                        <button onclick="duplicateUser('{{ username }}')">Duplicate</button>
+                    </td>
+                </tr>
+                {% for attribute in attributes %}
+                    <tr>
+                        <td class="merged-cell"></td>
+                        <td><input type="text" id="attribute-{{ attribute.id }}" value="{{ attribute.attribute }}"></td>
+                        <td>
+                            <select id="op-{{ attribute.id }}">
+                                <option value="=" ${attribute.op === '=' ? 'selected' : ''}>=</option>
+                                <option value="!=" ${attribute.op === '!=' ? 'selected' : ''}>!=</option>
+                                <option value=">" ${attribute.op === '>' ? 'selected' : ''}>></option>
+                                <option value="<" ${attribute.op === '<' ? 'selected' : ''}><</option>
+                                <option value=">=" ${attribute.op === '>=' ? 'selected' : ''}>>=</option>
+                                <option value="<=" ${attribute.op === '<=' ? 'selected' : ''}><=</option>
+                            </select>
+                        </td>
+                        <td><input type="text" id="value-{{ attribute.id }}" value="{{ attribute.value }}"></td>
+                        <td>
+                            <button onclick="updateAttribute('{{ attribute.id }}')">✅</button>
+                            <button onclick="location.reload()">❌</button>
+                            <a href="/delete_user/{{ attribute.id }}" onclick="saveScrollPosition()">🗑️</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endfor %}
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th>User Name</th>
+                <th>Attributes</th>
+                <th>Op</th>
+                <th>Value</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    <input type="text" id="new-username" value="">
+                </td>
+                <td colspan="3" class="merged-cell"></td>
+                <td>
+                    <button onclick="addNewUser()">Add New User</button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <dialog id="duplicate-dialog">
+        <div id="duplicate-dialog-content"></div>
+        <button id="close-dialog">❌</button>
+        <button id="save-duplicated-user">Save</button>
+    </dialog>
+
+    <style>
+        .merged-cell {
+            border: none;
+        }
+    </style>
+
+    <script>
+        function updateAttribute(attributeId) {
+            const attribute = document.getElementById(`attribute-${attributeId}`).value;
+            const op = document.getElementById(`op-${attributeId}`).value;
+            const value = document.getElementById(`value-${attributeId}`).value;
+
+            fetch('/update_user_attribute', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `attributeId=${attributeId}&attribute=${attribute}&op=${op}&value=${value}`
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === 'success') {
+                    location.reload();
+                } else {
+                    alert('Error updating attribute: ' + data);
+                }
+            });
+        }
+
+        function updateUserName(oldUserName) {
+            const newUserName = document.getElementById(`username-${oldUserName}`).value;
+
+            fetch('/update_user_name', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `oldUserName=${oldUserName}&newUserName=${newUserName}`
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === 'success') {
+                    location.reload();
+                } else {
+                    alert('Error updating user name: ' + data);
+                }
+            });
+        }
+
+        function addUserRow(userName) {
+            const table = event.target.closest('table').querySelector('tbody');
+            const newRow = table.insertRow(table.rows.length);
+
+            const cell1 = newRow.insertCell(0);
+            const cell2 = newRow.insertCell(1);
+            const cell3 = newRow.insertCell(2);
+            const cell4 = newRow.insertCell(3);
+            const cell5 = newRow.insertCell(4);
+
+            cell1.classList.add('merged-cell');
+            cell2.innerHTML = '<input type="text" id="new-attribute" value="">';
+            cell3.innerHTML = `
+                <select id="new-op">
+                    <option value="=">=</option>
+                    <option value="!=">!=</option>
+                    <option value=">">></option>
+                    <option value="<"><</option>
+                    <option value=">=">>=</option>
+                    <option value="<="><=</option>
+                </select>
+            `;
+            cell4.innerHTML = '<input type="text" id="new-value" value="">';
+            cell5.innerHTML = '<button onclick="saveNewUserRow(\'' + userName + '\', this)">✅</button> <button onclick="removeUserRow(this)">❌</button>';
+        }
+
+        function saveNewUserRow(userName, button) {
+            const row = button.parentNode.parentNode;
+            const attribute = row.querySelector('#new-attribute').value;
+            const op = row.querySelector('#new-op').value;
+            const value = row.querySelector('#new-value').value;
+
+            fetch('/add_user_attribute', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `username=${userName}&attribute=${attribute}&op=${op}&value=${value}`
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === 'success') {
+                    location.reload();
+                } else {
+                    alert('Error adding attribute: ' + data);
+                }
+            });
+        }
+
+        function removeUserRow(button) {
+            const row = button.parentNode.parentNode;
+            row.parentNode.removeChild(row);
+        }
+
+        function addNewUser() {
+            const newUserName = document.getElementById('new-username').value;
+
+            fetch('/add_user', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `username=${newUserName}`
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === 'success') {
+                    location.reload();
+                } else {
+                    alert('Error adding user: ' + data);
+                }
+            });
+        }
+
+        function saveScrollPosition() {
+            sessionStorage.setItem('scrollPosition', window.scrollY);
+        }
+
+        window.onload = function() {
+            const scrollPosition = sessionStorage.getItem('scrollPosition');
+            if (scrollPosition) {
+                window.scrollTo(0, scrollPosition);
+                sessionStorage.removeItem('scrollPosition');
+            }
+        }
+
+        function duplicateUser(userName) {
+            fetch('/duplicate_user', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `username=${userName}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                const newUserName = 'Copy of ' + userName;
+                let newTable = `<table border="1">
+                    <thead>
+                        <tr>
+                            <th>User Name</th>
+                            <th>Attributes</th>
+                            <th>Op</th>
+                            <th>Value</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <input type="text" id="new-username" value="${newUserName}">
+                            </td>
+                            <td colspan="3" class="merged-cell"></td>
+                            <td></td>
+                        </tr>`;
+
+                data.forEach((attribute, index) => {
+                    newTable += `<tr>
+                        <td class="merged-cell"></td>
+                        <td><input type="text" class="new-attribute" value="${attribute.attribute}"></td>
+                        <td>
+                            <select class="new-op">
+                                <option value="=" ${attribute.op === '=' ? 'selected' : ''}>=</option>
+                                <option value="!=" ${attribute.op === '!=' ? 'selected' : ''}>!=</option>
+                                <option value=">" ${attribute.op === '>' ? 'selected' : ''}>></option>
+                                <option value="<" ${attribute.op === '<' ? 'selected' : ''}><</option>
+                                <option value=">=" ${attribute.op === '>=' ? 'selected' : ''}>>=</option>
+                                <option value="<=" ${attribute.op === '<=' ? 'selected' : ''}><=</option>
+                            </select>
+                        </td>
+                        <td><input type="text" class="new-value" value="${attribute.value}"></td>
+                        <td><button onclick="removeDuplicatedUserRow(this)">🗑️</button></td>
+                    </tr>`;
+                });
+
+                newTable += `<tr>
+                    <td class="merged-cell"></td>
+                    <td colspan="3">
+                        <button onclick="addDuplicatedUserRow()">➕</button>
+                    </td>
+                    <td></td>
+                </tr></tbody></table>`;
+
+                document.getElementById('duplicate-dialog-content').innerHTML = newTable;
+                document.getElementById('duplicate-dialog').showModal();
+            });
+        }
+
+        document.getElementById('close-dialog').addEventListener('click', () => {
+            document.getElementById('duplicate-dialog').close();
+        });
+
+        document.getElementById('save-duplicated-user').addEventListener('click', () => {
+            saveDuplicatedUser();
+        });
+
+        function saveDuplicatedUser() {
+            let rows = document.querySelectorAll('#duplicate-dialog-content table tbody tr');
+            let username = rows[0].querySelector('#new-username').value;
+            let attributes = [];
+            for (let i = 1; i < rows.length - 1; i++) {
+                const attributeInput = rows[i].querySelector(`.new-attribute`);
+                const opInput = rows[i].querySelector(`.new-op`);
+                const valueInput = rows[i].querySelector(`.new-value`);
+
+                if (attributeInput && opInput && valueInput) {
+                    attributes.push({
+                        attribute: attributeInput.value,
+                        op: opInput.value,
+                        value: valueInput.value
+                    });
+                } else {
+                    console.warn(`Input elements not found for row ${i}`);
+                    return;
+                }
+            }
+
+            fetch('/save_duplicated_user', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username: username, attributes: attributes })
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === 'success') {
+                    document.getElementById('duplicate-dialog').close();
+                    location.reload();
+                } else {
+                    alert('Error saving duplicated user: ' + data);
+                }
+            });
+        }
+
+        function addDuplicatedUserRow() {
+            const table = document.querySelector('#duplicate-dialog-content table tbody');
+            const newRow = table.insertRow(table.rows.length - 1);
+
+            const cell1 = newRow.insertCell(0);
+            const cell2 = newRow.insertCell(1);
+            const cell3 = newRow.insertCell(2);
+            const cell4 = newRow.insertCell(3);
+            const cell5 = newRow.insertCell(4);
+
+            cell1.classList.add('merged-cell');
+            cell2.innerHTML = `<input type="text" class="new-attribute" value="">`;
+            cell3.innerHTML = `
+                <select class="new-op">
+                    <option value="=">=</option>
+                    <option value="!=">!=</option>
+                    <option value=">">></option>
+                    <option value="<"><</option>
+                    <option value=">=">>=</option>
+                    <option value="<="><=</option>
+                </select>
+            `;
+            cell4.innerHTML = `<input type="text" class="new-value" value="">`;
+            cell5.innerHTML = `<button onclick="removeDuplicatedUserRow(this)">🗑️</button>`;
+        }
+
+        function removeDuplicatedUserRow(button) {
+            const row = button.parentNode.parentNode;
+            row.parentNode.removeChild(row);
+        }
+    </script>
+{% endblock %}

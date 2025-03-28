@@ -1,0 +1,364 @@
+{% extends 'base.html' %}
+
+{% block title %}Group List{% endblock %}
+
+{% block content %}
+    <h1>Group List</h1>
+
+    {% for groupname, attributes in grouped_results.items() %}
+        <table border="1">
+            <thead>
+                <tr>
+                    <th>Group Name</th>
+                    <th>Attributes</th>
+                    <th>Op</th>
+                    <th>Value</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <input type="text" id="groupname-{{ groupname }}" value="{{ groupname }}">
+                    </td>
+                    <td colspan="3" class="merged-cell">
+                        <button onclick="addRow('{{ groupname }}')">➕</button>
+                    </td>
+                    <td>
+                        <button onclick="updateGroupName('{{ groupname }}')">✅ Rename Group</button>
+                        <button onclick="location.reload()">❌</button>
+                        <a href="/delete_group_rows/{{ groupname }}" onclick="saveScrollPosition()">🗑️</a>
+                        <button onclick="duplicateGroup('{{ groupname }}')">Duplicate</button>
+                    </td>
+                </tr>
+                {% for attribute in attributes %}
+                    <tr>
+                        <td class="merged-cell"></td>
+                        <td><input type="text" id="attribute-{{ attribute.id }}" value="{{ attribute.attribute }}"></td>
+                        <td>
+                            <select id="op-{{ attribute.id }}">
+                                <option value="=" ${attribute.op === '=' ? 'selected' : ''}>=</option>
+                                <option value="!=" ${attribute.op === '!=' ? 'selected' : ''}>!=</option>
+                                <option value=">" ${attribute.op === '>' ? 'selected' : ''}>></option>
+                                <option value="<" ${attribute.op === '<' ? 'selected' : ''}><</option>
+                                <option value=">=" ${attribute.op === '>=' ? 'selected' : ''}>>=</option>
+                                <option value="<=" ${attribute.op === '<=' ? 'selected' : ''}><=</option>
+                            </select>
+                        </td>
+                        <td><input type="text" id="value-{{ attribute.id }}" value="{{ attribute.value }}"></td>
+                        <td>
+                            <button onclick="updateAttribute('{{ attribute.id }}')">✅</button>
+                            <button onclick="location.reload()">❌</button>
+                            <a href="/delete_group/{{ attribute.id }}" onclick="saveScrollPosition()">🗑️</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endfor %}
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Group Name</th>
+                <th>Attributes</th>
+                <th>Op</th>
+                <th>Value</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    <input type="text" id="new-groupname" value="">
+                </td>
+                <td colspan="3" class="merged-cell"></td>
+                <td>
+                    <button onclick="addNewGroup()">Add New Group</button>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <dialog id="duplicate-dialog">
+        <div id="duplicate-dialog-content"></div>
+        <button id="close-dialog">❌</button>
+        <button id="save-duplicated-group">Save</button>
+    </dialog>
+
+    <style>
+        .merged-cell {
+            border: none;
+        }
+    </style>
+
+    <script>
+        function updateAttribute(attributeId) {
+            const attribute = document.getElementById(`attribute-${attributeId}`).value;
+            const op = document.getElementById(`op-${attributeId}`).value;
+            const value = document.getElementById(`value-${attributeId}`).value;
+
+            fetch('/update_attribute', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `attributeId=${attributeId}&attribute=${attribute}&op=${op}&value=${value}`
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === 'success') {
+                    location.reload();
+                } else {
+                    alert('Error updating attribute: ' + data);
+                }
+            });
+        }
+
+        function updateGroupName(oldGroupName) {
+            const newGroupName = document.getElementById(`groupname-${oldGroupName}`).value;
+
+            fetch('/update_group_name', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `oldGroupName=${oldGroupName}&newGroupName=${newGroupName}`
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === 'success') {
+                    location.reload();
+                } else {
+                    alert('Error updating group name: ' + data);
+                }
+            });
+        }
+
+        function addRow(groupName) {
+            const table = event.target.closest('table').querySelector('tbody');
+            const newRow = table.insertRow(table.rows.length);
+
+            const cell1 = newRow.insertCell(0);
+            const cell2 = newRow.insertCell(1);
+            const cell3 = newRow.insertCell(2);
+            const cell4 = newRow.insertCell(3);
+            const cell5 = newRow.insertCell(4);
+
+            cell1.classList.add('merged-cell');
+            cell2.innerHTML = '<input type="text" id="new-attribute" value="">';
+            cell3.innerHTML = `
+                <select id="new-op">
+                    <option value="=">=</option>
+                    <option value="!=">!=</option>
+                    <option value=">">></option>
+                    <option value="<"><</option>
+                    <option value=">=">>=</option>
+                    <option value="<="><=</option>
+                </select>
+            `;
+            cell4.innerHTML = '<input type="text" id="new-value" value="">';
+            cell5.innerHTML = '<button onclick="saveNewRow(\'' + groupName + '\', this)">✅</button> <button onclick="removeRow(this)">❌</button>';
+        }
+
+        function saveNewRow(groupName, button) {
+            const row = button.parentNode.parentNode;
+            const attribute = row.querySelector('#new-attribute').value;
+            const op = row.querySelector('#new-op').value;
+            const value = row.querySelector('#new-value').value;
+
+            fetch('/add_attribute', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `groupname=${groupName}&attribute=${attribute}&op=${op}&value=${value}`
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === 'success') {
+                    location.reload();
+                } else {
+                    alert('Error adding attribute: ' + data);
+                }
+            });
+        }
+
+        function removeRow(button) {
+            const row = button.parentNode.parentNode;
+            row.parentNode.removeChild(row);
+        }
+
+        function addNewGroup() {
+            const newGroupName = document.getElementById('new-groupname').value;
+
+            fetch('/add_group', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `groupname=${newGroupName}`
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === 'success') {
+                    location.reload();
+                } else {
+                    alert('Error adding group: ' + data);
+                }
+            });
+        }
+
+        function saveScrollPosition() {
+            sessionStorage.setItem('scrollPosition', window.scrollY);
+        }
+
+        window.onload = function() {
+            const scrollPosition = sessionStorage.getItem('scrollPosition');
+            if (scrollPosition) {
+                window.scrollTo(0, scrollPosition);
+                sessionStorage.removeItem('scrollPosition');
+            }
+        }
+
+        function duplicateGroup(groupName) {
+            fetch('/duplicate_group', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `groupname=${groupName}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                const newGroupName = 'Copy of ' + groupName;
+                let newTable = `<table border="1">
+                    <thead>
+                        <tr>
+                            <th>Group Name</th>
+                            <th>Attributes</th>
+                            <th>Op</th>
+                            <th>Value</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <input type="text" id="new-groupname" value="${newGroupName}">
+                            </td>
+                            <td colspan="3" class="merged-cell"></td>
+                            <td></td>
+                        </tr>`;
+
+                data.forEach((attribute, index) => {
+                    newTable += `<tr>
+                        <td class="merged-cell"></td>
+                        <td><input type="text" class="new-attribute" value="${attribute.attribute}"></td>
+                        <td>
+                            <select class="new-op">
+                                <option value="=" ${attribute.op === '=' ? 'selected' : ''}>=</option>
+                                <option value="!=" ${attribute.op === '!=' ? 'selected' : ''}>!=</option>
+                                <option value=">" ${attribute.op === '>' ? 'selected' : ''}>></option>
+                                <option value="<" ${attribute.op === '<' ? 'selected' : ''}><</option>
+                                <option value=">=" ${attribute.op === '>=' ? 'selected' : ''}>>=</option>
+                                <option value="<=" ${attribute.op === '<=' ? 'selected' : ''}><=</option>
+                            </select>
+                        </td>
+                        <td><input type="text" class="new-value" value="${attribute.value}"></td>
+                        <td><button onclick="removeDuplicatedRow(this)">🗑️</button></td>
+                    </tr>`;
+                });
+
+                newTable += `<tr>
+                    <td class="merged-cell"></td>
+                    <td colspan="3">
+                        <button onclick="addDuplicatedRow()">➕</button>
+                    </td>
+                    <td></td>
+                </tr></tbody></table>`;
+
+                document.getElementById('duplicate-dialog-content').innerHTML = newTable;
+                document.getElementById('duplicate-dialog').showModal();
+            });
+        }
+
+        document.getElementById('close-dialog').addEventListener('click', () => {
+            document.getElementById('duplicate-dialog').close();
+        });
+
+        document.getElementById('save-duplicated-group').addEventListener('click', () => {
+            saveDuplicatedGroup();
+        });
+
+        function saveDuplicatedGroup() {
+            let rows = document.querySelectorAll('#duplicate-dialog-content table tbody tr');
+            let groupname = rows[0].querySelector('#new-groupname').value;
+            let attributes = [];
+            for (let i = 1; i < rows.length - 1; i++) {
+                const attributeInput = rows[i].querySelector(`.new-attribute`);
+                const opInput = rows[i].querySelector(`.new-op`);
+                const valueInput = rows[i].querySelector(`.new-value`);
+
+                if (attributeInput && opInput && valueInput) {
+                    attributes.push({
+                        attribute: attributeInput.value,
+                        op: opInput.value,
+                        value: valueInput.value
+                    });
+                } else {
+                    console.warn(`Input elements not found for row ${i}`);
+                    return;
+                }
+            }
+
+            fetch('/save_duplicated_group', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ groupname: groupname, attributes: attributes })
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data === 'success') {
+                    document.getElementById('duplicate-dialog').close();
+                    location.reload();
+                } else {
+                    alert('Error saving duplicated group: ' + data);
+                }
+            });
+        }
+
+        function addDuplicatedRow() {
+            const table = document.querySelector('#duplicate-dialog-content table tbody');
+            const newRow = table.insertRow(table.rows.length - 1);
+
+            const cell1 = newRow.insertCell(0);
+            const cell2 = newRow.insertCell(1);
+            const cell3 = newRow.insertCell(2);
+            const cell4 = newRow.insertCell(3);
+            const cell5 = newRow.insertCell(4);
+
+            cell1.classList.add('merged-cell');
+            cell2.innerHTML = `<input type="text" class="new-attribute" value="">`;
+            cell3.innerHTML = `
+                <select class="new-op">
+                    <option value="=">=</option>
+                    <option value="!=">!=</option>
+                    <option value=">">></option>
+                    <option value="<"><</option>
+                    <option value=">=">>=</option>
+                    <option value="<="><=</option>
+                </select>
+            `;
+            cell4.innerHTML = `<input type="text" class="new-value" value="">`;
+            cell5.innerHTML = `<button onclick="removeDuplicatedRow(this)">🗑️</button>`;
+        }
+
+        function removeDuplicatedRow(button) {
+            const row = button.parentNode.parentNode;
+            row.parentNode.removeChild(row);
+        }
+    </script>
+{% endblock %}

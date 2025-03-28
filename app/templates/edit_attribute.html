@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit Attribute</title>
+</head>
+<body>
+    <h1>Edit Attribute</h1>
+
+    <form method="POST">
+        <label for="attribute">Attribute:</label><br>
+        <input type="text" id="attribute" name="attribute" value="{{ attribute_data.attribute }}"><br><br>
+
+        <label for="op">Op:</label><br>
+        <input type="text" id="op" name="op" value="{{ attribute_data.op }}"><br><br>
+
+        <label for="value">Value:</label><br>
+        <input type="text" id="value" name="value" value="{{ attribute_data.value }}"><br><br>
+
+        <input type="submit" value="Save Changes">
+    </form>
+</body>
+</html>
