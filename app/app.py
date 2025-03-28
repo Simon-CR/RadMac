@@ -90,25 +90,35 @@ def sql():
 
 @app.route('/user_list')
 def user_list():
+    """Displays the user list with VLAN IDs."""
     db = get_db()
-    if db:
-        cursor = db.cursor(dictionary=True)
+    if db is None:
+        return "Database connection failed", 500
+
+    cursor = db.cursor(dictionary=True)
+    try:
+        # Fetch users and their group assignments
         cursor.execute("""
-            SELECT
-                rc.username AS mac_address,
-                IFNULL(rug.groupname, 'N/A') AS vlan_id,  -- Changed to get groupname from radusergroup
-                IFNULL((SELECT value FROM radcheck rch
-                         WHERE rch.username = rc.username AND rch.attribute = 'User-Description' LIMIT 1), 'N/A') AS description
-            FROM radcheck rc
-            LEFT JOIN radusergroup rug ON rc.username = rug.username  -- Join radcheck and radusergroup
-            WHERE rc.attribute = 'Cleartext-Password'
-            GROUP BY rc.username;
+            SELECT r.username AS mac_address, r.value AS description, ug.groupname AS vlan_id
+            FROM radcheck r
+            LEFT JOIN radusergroup ug ON r.username = ug.username
+            WHERE r.attribute = 'User-Description'
         """)
         results = cursor.fetchall()
+
+        # Fetch all group names for the dropdown
+        cursor.execute("SELECT groupname FROM radgroupcheck")
+        groups = cursor.fetchall()
+        groups = [{'groupname': row['groupname']} for row in groups] # changed
+
         cursor.close()
         db.close()
-        return render_template('user_list_inline_edit.html', results=results)
-    return "Database Connection Failed"
+        return render_template('user_list_inline_edit.html', results=results, groups=groups) # added groups
+    except mysql.connector.Error as e:
+        print(f"Database error: {e}")
+        cursor.close()
+        db.close()
+        return "Database error", 500
 
 @app.route('/update_user', methods=['POST'])
 def update_user():

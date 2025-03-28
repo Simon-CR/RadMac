@@ -20,13 +20,7 @@
                     <td><input type="text" id="mac_address-{{ user.mac_address }}" value="{{ user.mac_address }}"></td>
                     <td><input type="text" id="description-{{ user.mac_address }}" value="{{ user.description }}"></td>
                     <td>
-                        <select id="vlan_id-{{ user.mac_address }}">
-                            {% for group in groups %}
-                                <option value="{{ group.groupname }}" {% if user.groupname == group.groupname %} selected {% endif %}>
-                                    {{ group.groupname }}
-                                </option>
-                            {% endfor %}
-                        </select>
+                        <input type="text" id="vlan_id-{{ user.mac_address }}" value="{{ user.vlan_id }}">
                     </td>
                     <td>
                         <button onclick="updateUser('{{ user.mac_address }}')">✅</button>
