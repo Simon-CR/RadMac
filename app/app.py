@@ -96,12 +96,12 @@ def user_list():
         cursor.execute("""
             SELECT
                 rc.username AS mac_address,
-                IFNULL((SELECT value FROM radgroupreply rgr
-                         WHERE rgr.groupname = (SELECT groupname FROM radusergroup rug WHERE rug.username = rc.username LIMIT 1)
-                         AND rgr.attribute = 'Tunnel-Private-Group-Id' LIMIT 1), 'N/A') AS vlan_id,
+                IFNULL(rug.groupname, 'N/A') AS vlan_id,  -- Changed to get groupname from radusergroup
                 IFNULL((SELECT value FROM radcheck rch
                          WHERE rch.username = rc.username AND rch.attribute = 'User-Description' LIMIT 1), 'N/A') AS description
             FROM radcheck rc
+            LEFT JOIN radusergroup rug ON rc.username = rug.username  -- Join radcheck and radusergroup
+            WHERE rc.attribute = 'Cleartext-Password'
             GROUP BY rc.username;
         """)
         results = cursor.fetchall()
