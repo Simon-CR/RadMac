@@ -78,9 +78,36 @@
     </dialog>
 
     <dialog id="duplicate-dialog">
-        <div id="duplicate-dialog-content"></div>
-        <button id="close-dialog">❌</button>
-        <button id="save-duplicated-user">Save</button>
+        <div id="duplicate-dialog-content">
+            <table border="1">
+                <thead>
+                    <tr>
+                        <th>MAC Address</th>
+                        <th>Description</th>
+                        <th>VLAN ID</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><input type="text" id="dup-mac"></td>
+                        <td><input type="text" id="dup-description"></td>
+                        <td>
+                            <select id="dup-vlan_id">
+                                {% for group in groups %}
+                                    <option value="{{ group.groupname }}">
+                                        {{ group.groupname }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
+            <button id="close-duplicate-dialog">Cancel</button>
+            <button id="save-duplicated-user">Save</button>
+        </div>
     </dialog>
 
     <style>
@@ -160,53 +187,47 @@
 
 
         function duplicateUser(mac_address) {
-            fetch('/duplicate_user', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `mac_address=${mac_address}`
-            })
-                .then(response => response.json())
-                .then(data => {
-                    const userData = data;
-                    let newTable = `<table border="1">
-                    <thead>
-                        <tr>
-                            <th>MAC Address</th>
-                            <th>Description</th>
-                            <th>VLAN ID</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><input type="text" id="new-mac" value="${userData.mac_address}"></td>
-                            <td><input type="text" class="new-description" value="${userData.description}"></td>
-                            <td>
-                                <select id="new-vlan_id">
-                                     {% for group in groups %}
-                                          <option value="{{ group.groupname }}" ${userData.vlan_id === group.groupname ? 'selected' : ''}>
-                                             {{ group.groupname }}
-                                        </option>
-                                     {% endfor %}
-                                </select>
-                            </td>
-                        </tr>`;
+    console.log("duplicateUser called with mac_address:", mac_address);
+    fetch('/duplicate_user', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `mac_address=${mac_address}`
+    })
+    .then(response => {
+        console.log("Response status:", response.status);
+        console.log("Response text:", response.text());
+        return response.json()
+    })
+    .then(data => {
+        console.log("Response data:", data);
+        const userData = data;
+        if (userData) {
+            document.getElementById('dup-mac').value = userData.mac_address;
+            document.getElementById('dup-description').value = userData.description;
 
+            const vlanSelect = document.getElementById('dup-vlan_id');
+            vlanSelect.innerHTML = '';
+            {% for group in groups %}
+                let option = document.createElement('option');
+                option.value = "{{ group.groupname }}";
+                option.textContent = "{{ group.groupname }}";
+                if ("{{ group.groupname }}" === userData.vlan_id) {
+                    option.selected = true;
+                }
+                vlanSelect.appendChild(option);
+            {% endfor %}
 
-
-                    newTable += `<tr>
-                    <td colspan="3" class="merged-cell">
-                        <button onclick="addDuplicatedUserRow(this)">➕</button>
-                    </td>
-                </tr></tbody></table>`;
-
-                    document.getElementById('duplicate-dialog-content').innerHTML = newTable;
-                    document.getElementById('duplicate-dialog').showModal();
-                });
+            document.getElementById('duplicate-dialog').showModal();
+        } else {
+            alert("Failed to retrieve user data for duplication.");
+        }
+    });
+}
         }
 
-        document.getElementById('close-dialog').addEventListener('click', () => {
+        document.getElementById('close-duplicate-dialog').addEventListener('click', () => {
             document.getElementById('duplicate-dialog').close();
         });
 
@@ -215,72 +236,38 @@
         });
 
         function saveDuplicatedUser() {
-            let rows = document.querySelectorAll('#duplicate-dialog-content table tbody tr');
-            let new_mac_address = rows[0].querySelector('#new-mac').value; //changed
-            let attributes = [];
-            for (let i = 1; i < rows.length - 1; i++) {
-                const descriptionInput = rows[i].querySelector(`.new-description`);
-                const vlanIdInput = rows[i].querySelector(`.new-vlan_id`);
+            let mac = document.getElementById('dup-mac').value;
+            let description = document.getElementById('dup-description').value;
+            let vlan_id = document.getElementById('dup-vlan_id').value;
 
-
-                if (descriptionInput && vlanIdInput) {
-                    attributes.push({
-                        description: descriptionInput.value,
-                        vlan_id: vlanIdInput.value,
-                    });
-                } else {
-
-                    console.warn(`Input elements not found for row ${i}`);
-                    return;
-                }
-            }
-
-            fetch('/save_duplicated_user', {
+            fetch('/add_user', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ mac_address: new_mac_address, attributes: attributes }) //changed
+                body: JSON.stringify({ mac_address: mac, description: description, vlan_id: vlan_id }),
             })
-                .then(response => response.text())
-                .then(data => {
-                    if (data === 'success') {
+                .then((response) => {
+                    if (!response.ok) {
+                        return response.text().then((text) => {
+                            throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then((data) => {
+                    console.log("Server response:", data);
+                    if (data && data.success) {
                         document.getElementById('duplicate-dialog').close();
                         location.reload();
                     } else {
-                        alert('Error saving duplicated user: ' + data);
+                        alert("Error adding user: " + (data && data.message ? data.message : "Unknown error"));
                     }
+                })
+                .catch((error) => {
+                    console.error("Fetch error:", error);
+                    alert("Error adding user: " + error.message);
                 });
-        }
-
-        function addDuplicatedUserRow(button) {
-            const table = button.parentNode.parentNode.parentNode; //get the table
-            const newRow = table.insertRow(table.rows.length - 1);
-
-
-
-            const cell1 = newRow.insertCell(0);
-            const cell2 = newRow.insertCell(1);
-            const cell3 = newRow.insertCell(2);
-            const cell4 = newRow.insertCell(3);
-
-
-
-            cell1.classList.add('merged-cell');
-            cell2.innerHTML = `<input type="text" class="new-description" value="">`;
-            cell3.innerHTML = `<select class="new-vlan_id">
-                                    {% for group in groups %}
-                                        <option value="{{ group.groupname }}">
-                                            {{ group.groupname }}
-                                        </option>
-                                    {% endfor %}
-                                </select>`;
-            cell4.innerHTML = `<button onclick="removeDuplicatedUserRow(this)">🗑️</button>`;
-        }
-
-        function removeDuplicatedUserRow(button) {
-            const row = button.parentNode.parentNode;
-            row.parentNode.removeChild(row);
         }
 
         function addNewUserRow() {
@@ -295,7 +282,7 @@
             saveNewUser();
         });
 
-       function saveNewUser() {
+        function saveNewUser() {
             const mac = document.getElementById('new-mac').value;
             const description = document.getElementById('new-description').value;
             const vlan_id = document.getElementById('new-vlan_id').value;
@@ -321,28 +308,28 @@
                 },
                 body: JSON.stringify(userData), // Send the data as a JSON string
             })
-            .then(response => {
-                if (!response.ok) {
-                    // Handle HTTP errors (e.g., 400, 500)
-                    return response.text().then(text => {
-                        throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
-                    });
-                }
-                return response.json(); // Expect JSON response from server
-            })
-            .then(data => {
-                console.log("Server response:", data);
-                if (data && data.success) { // Check for success property in JSON response
-                    document.getElementById('add-user-dialog').close();
-                    location.reload();
-                } else {
-                    alert('Error adding user: ' + (data && data.message ? data.message : 'Unknown error')); // Show error from server or a generic message
-                }
-            })
-            .catch(error => {
-                console.error('Fetch error:', error); // Log the error for debugging
-                alert('Error adding user: ' + error.message); // Show a user-friendly error message
-            });
+                .then(response => {
+                    if (!response.ok) {
+                        // Handle HTTP errors (e.g., 400, 500)
+                        return response.text().then(text => {
+                            throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
+                        });
+                    }
+                    return response.json(); // Expect JSON response from server
+                })
+                .then(data => {
+                    console.log("Server response:", data);
+                    if (data && data.success) { // Check for success property in JSON response
+                        document.getElementById('add-user-dialog').close();
+                        location.reload();
+                    } else {
+                        alert('Error adding user: ' + (data && data.message ? data.message : 'Unknown error')); // Show error from server or a generic message
+                    }
+                })
+                .catch(error => {
+                    console.error('Fetch error:', error); // Log the error for debugging
+                    alert('Error adding user: ' + error.message); // Show a user-friendly error message
+                });
         }
     </script>
 {% endblock %}

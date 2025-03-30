@@ -563,6 +563,56 @@ def add_user():
     except Exception as e:
         return jsonify({'success': False, 'message': 'Unknown error'}), 500
 
+@app.route('/duplicate_user', methods=['POST'])
+def duplicate_user():
+    """
+    Retrieves user data (MAC address, description, VLAN ID) from the database
+    based on the provided MAC address.  This data is intended to be used to
+    pre-populate a "duplicate user" form in the frontend.
+    """
+    mac_address = request.form['mac_address']  # Get the MAC address from the POST request.
+
+    db = get_db()  # Get a database connection.
+    if db:
+        cursor = db.cursor(dictionary=True)  # Create a cursor that returns results as dictionaries.
+        try:
+            # Construct the SQL query.  This query retrieves the MAC address,
+            # description, and VLAN ID for the specified user.
+            cursor.execute("""
+                SELECT
+                    rc.username AS mac_address,
+                    IFNULL((SELECT value FROM radgroupreply rgr
+                             WHERE rgr.groupname = (SELECT groupname FROM radusergroup rug WHERE rug.username = rc.username LIMIT 1)
+                             AND rgr.attribute = 'Tunnel-Private-Group-Id' LIMIT 1), 'N/A') AS vlan_id,
+                    IFNULL((SELECT value FROM radcheck rch
+                             WHERE rch.username = rc.username AND rch.attribute = 'User-Description' LIMIT 1), 'N/A') AS description
+                FROM radcheck rc
+                WHERE rc.username = %s  /* %s is a placeholder for the MAC address */
+                GROUP BY rc.username;
+            """, (mac_address,))  # Execute the query with the MAC address as a parameter.
+
+            user_data = cursor.fetchone()  # Fetch the first (and should be only) result.
+            cursor.close()  # Close the cursor.
+            db.close()      # Close the database connection.
+
+            if user_data:
+                # If user data was found, return it as a JSON response.
+                return jsonify(user_data)
+            else:
+                # If no user data was found (e.g., invalid MAC address), return an empty JSON object.
+                return jsonify({})
+
+        except mysql.connector.Error as err:
+            # Handle database errors.  Log the error and return an error message.
+            print(f"Database Error: {err}")
+            cursor.close()
+            db.close()
+            return jsonify({})  #  Return an empty JSON object on error, to avoid crashing.
+
+    else:
+        # Handle the case where the database connection could not be established.
+        return jsonify({})  # Return empty JSON object
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
