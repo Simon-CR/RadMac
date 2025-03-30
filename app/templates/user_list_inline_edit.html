@@ -30,9 +30,7 @@
                     </td>
                     <td>
                         <button onclick="updateUser('{{ user.mac_address }}')">✅</button>
-                        <button onclick="location.reload()">❌</button>
                         <a href="/delete_user/{{ user.mac_address }}" onclick="saveScrollPosition()">🗑️</a>
-                        <button onclick="duplicateUser('{{ user.mac_address }}')">Duplicate</button>
                     </td>
                 </tr>
             {% endfor %}
@@ -77,44 +75,7 @@
         </div>
     </dialog>
 
-    <dialog id="duplicate-dialog">
-        <div id="duplicate-dialog-content">
-            <table border="1">
-                <thead>
-                    <tr>
-                        <th>MAC Address</th>
-                        <th>Description</th>
-                        <th>VLAN ID</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><input type="text" id="dup-mac"></td>
-                        <td><input type="text" id="dup-description"></td>
-                        <td>
-                            <select id="dup-vlan_id">
-                                {% for group in groups %}
-                                    <option value="{{ group.groupname }}">
-                                        {{ group.groupname }}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
-            <button id="close-duplicate-dialog">Cancel</button>
-            <button id="save-duplicated-user">Save</button>
-        </div>
-    </dialog>
-
     <style>
-        .merged-cell {
-            border: none;
-        }
-
         #cancel-add-user-dialog {
             border-radius: 5px;
             padding: 10px;
@@ -150,17 +111,18 @@
     </style>
 
     <script>
+        const groups = {{ groups | tojson | safe }};
+
         function updateUser(mac_address) {
             const description = document.getElementById('description-' + mac_address).value;
             const vlan_id = document.getElementById('vlan_id-' + mac_address).value;
-            const mac_address_input = document.getElementById('mac_address-' + mac_address).value; //added
 
             fetch('/update_user', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: `mac_address=${mac_address}&description=${description}&vlan_id=${vlan_id}&new_mac_address=${mac_address_input}` //added new param
+                body: `mac_address=${mac_address}&description=${description}&vlan_id=${vlan_id}`
             })
             .then(response => response.text())
             .then(data => {
@@ -182,92 +144,6 @@
                 window.scrollTo(0, scrollPosition);
                 sessionStorage.removeItem('scrollPosition');
             }
-        }
-
-
-
-        function duplicateUser(mac_address) {
-    console.log("duplicateUser called with mac_address:", mac_address);
-    fetch('/duplicate_user', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `mac_address=${mac_address}`
-    })
-    .then(response => {
-        console.log("Response status:", response.status);
-        console.log("Response text:", response.text());
-        return response.json()
-    })
-    .then(data => {
-        console.log("Response data:", data);
-        const userData = data;
-        if (userData) {
-            document.getElementById('dup-mac').value = userData.mac_address;
-            document.getElementById('dup-description').value = userData.description;
-
-            const vlanSelect = document.getElementById('dup-vlan_id');
-            vlanSelect.innerHTML = '';
-            {% for group in groups %}
-                let option = document.createElement('option');
-                option.value = "{{ group.groupname }}";
-                option.textContent = "{{ group.groupname }}";
-                if ("{{ group.groupname }}" === userData.vlan_id) {
-                    option.selected = true;
-                }
-                vlanSelect.appendChild(option);
-            {% endfor %}
-
-            document.getElementById('duplicate-dialog').showModal();
-        } else {
-            alert("Failed to retrieve user data for duplication.");
-        }
-    });
-}
-        }
-
-        document.getElementById('close-duplicate-dialog').addEventListener('click', () => {
-            document.getElementById('duplicate-dialog').close();
-        });
-
-        document.getElementById('save-duplicated-user').addEventListener('click', () => {
-            saveDuplicatedUser();
-        });
-
-        function saveDuplicatedUser() {
-            let mac = document.getElementById('dup-mac').value;
-            let description = document.getElementById('dup-description').value;
-            let vlan_id = document.getElementById('dup-vlan_id').value;
-
-            fetch('/add_user', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ mac_address: mac, description: description, vlan_id: vlan_id }),
-            })
-                .then((response) => {
-                    if (!response.ok) {
-                        return response.text().then((text) => {
-                            throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
-                        });
-                    }
-                    return response.json();
-                })
-                .then((data) => {
-                    console.log("Server response:", data);
-                    if (data && data.success) {
-                        document.getElementById('duplicate-dialog').close();
-                        location.reload();
-                    } else {
-                        alert("Error adding user: " + (data && data.message ? data.message : "Unknown error"));
-                    }
-                })
-                .catch((error) => {
-                    console.error("Fetch error:", error);
-                    alert("Error adding user: " + error.message);
-                });
         }
 
         function addNewUserRow() {
@@ -292,44 +168,33 @@
                 return;
             }
 
-            // Construct the data as an object
-            const userData = {
-                username: mac, // Use MAC as username
-                password: mac, // Use MAC as password
-                mac_address: mac,
-                description: description,
-                vlan_id: vlan_id
-            };
-
-            fetch('/add_user', {  // Make sure this URL is correct
+            fetch('/add_user', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json', // Set the content type to JSON
+                    'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(userData), // Send the data as a JSON string
+                body: JSON.stringify({ mac_address: mac, description: description, vlan_id: vlan_id }),
             })
-                .then(response => {
-                    if (!response.ok) {
-                        // Handle HTTP errors (e.g., 400, 500)
-                        return response.text().then(text => {
-                            throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
-                        });
-                    }
-                    return response.json(); // Expect JSON response from server
-                })
-                .then(data => {
-                    console.log("Server response:", data);
-                    if (data && data.success) { // Check for success property in JSON response
-                        document.getElementById('add-user-dialog').close();
-                        location.reload();
-                    } else {
-                        alert('Error adding user: ' + (data && data.message ? data.message : 'Unknown error')); // Show error from server or a generic message
-                    }
-                })
-                .catch(error => {
-                    console.error('Fetch error:', error); // Log the error for debugging
-                    alert('Error adding user: ' + error.message); // Show a user-friendly error message
-                });
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data && data.success) {
+                    document.getElementById('add-user-dialog').close();
+                    location.reload();
+                } else {
+                    alert('Error adding user: ' + (data && data.message ? data.message : 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Fetch error:', error);
+                alert('Error adding user: ' + error.message);
+            });
         }
     </script>
 {% endblock %}

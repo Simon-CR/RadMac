@@ -90,30 +90,35 @@ def sql():
 
 @app.route('/user_list')
 def user_list():
-    """Displays the user list with VLAN IDs."""
+    """Displays the user list with VLAN IDs and descriptions from rad_description."""
     db = get_db()
     if db is None:
         return "Database connection failed", 500
 
     cursor = db.cursor(dictionary=True)
     try:
-        # Fetch users and their group assignments
+        # Fetch users, their group assignments, and descriptions from rad_description
         cursor.execute("""
-            SELECT r.username AS mac_address, r.value AS description, ug.groupname AS vlan_id
+            SELECT 
+                r.username AS mac_address, 
+                rd.description AS description, 
+                ug.groupname AS vlan_id
             FROM radcheck r
             LEFT JOIN radusergroup ug ON r.username = ug.username
-            WHERE r.attribute = 'User-Description'
-        """)
+            LEFT JOIN rad_description rd ON r.username = rd.username
+        """) #removed WHERE clause
         results = cursor.fetchall()
+        print("Results:", results) #added print statement
 
         # Fetch all group names for the dropdown
         cursor.execute("SELECT groupname FROM radgroupcheck")
         groups = cursor.fetchall()
-        groups = [{'groupname': row['groupname']} for row in groups] # changed
+        groups = [{'groupname': row['groupname']} for row in groups]
+        print("Groups:", groups) #added print statement
 
         cursor.close()
         db.close()
-        return render_template('user_list_inline_edit.html', results=results, groups=groups) # added groups
+        return render_template('user_list_inline_edit.html', results=results, groups=groups)
     except mysql.connector.Error as e:
         print(f"Database error: {e}")
         cursor.close()
@@ -132,12 +137,14 @@ def update_user():
         try:
             db.autocommit = False
 
+            # Update rad_description table
             cursor.execute("""
-                UPDATE radcheck
-                SET value = %s
-                WHERE username = %s AND attribute = 'User-Description'
+                UPDATE rad_description
+                SET description = %s
+                WHERE username = %s
             """, (description, mac_address))
 
+            # Update radgroupreply table for VLAN ID
             cursor.execute("""
                 UPDATE radgroupreply rgr
                 SET value = %s
@@ -169,65 +176,77 @@ def delete_user(mac_address):
     if db:
         cursor = db.cursor()
         try:
+            db.autocommit = False #Start transaction
+
+            # Delete from rad_description
+            cursor.execute("DELETE FROM rad_description WHERE username = %s", (mac_address,))
+
+            # Delete from radcheck
             cursor.execute("DELETE FROM radcheck WHERE username = %s", (mac_address,))
-            db.commit()
+
+            #Delete from radusergroup
+            cursor.execute("DELETE FROM radusergroup WHERE username = %s", (mac_address,))
+
+            db.commit() #Commit transaction
+            db.autocommit = True
             cursor.close()
             db.close()
             return redirect(url_for('user_list'))
         except mysql.connector.Error as err:
             print(f"Database Error: {err}")
-            db.rollback()
+            db.rollback() #Roll back transaction on error
+            db.autocommit = True
             cursor.close()
             db.close()
             return redirect(url_for('user_list'))
     return "Database Connection Failed"
 
-@app.route('/edit_user/<mac_address>', methods=['GET', 'POST'])
-def edit_user(mac_address):
-    db = get_db()
-    if db:
-        cursor = db.cursor(dictionary=True)
+# @app.route('/edit_user/<mac_address>', methods=['GET', 'POST'])
+# def edit_user(mac_address):
+#     db = get_db()
+#     if db:
+#         cursor = db.cursor(dictionary=True)
 
-        if request.method == 'POST':
-            description = request.form['description']
-            vlan_id = request.form['vlan_id']
+#         if request.method == 'POST':
+#             description = request.form['description']
+#             vlan_id = request.form['vlan_id']
 
-            cursor.execute("""
-                UPDATE radcheck
-                SET value = %s
-                WHERE username = %s AND attribute = 'User-Description'
-            """, (description, mac_address))
+#             cursor.execute("""
+#                 UPDATE radcheck
+#                 SET value = %s
+#                 WHERE username = %s AND attribute = 'User-Description'
+#             """, (description, mac_address))
 
-            cursor.execute("""
-                UPDATE radgroupreply rgr
-                SET value = %s
-                WHERE rgr.groupname = (SELECT groupname FROM radusergroup rug WHERE rug.username = %s LIMIT 1)
-                AND rgr.attribute = 'Tunnel-Private-Group-Id'
-            """, (vlan_id, mac_address))
+#             cursor.execute("""
+#                 UPDATE radgroupreply rgr
+#                 SET value = %s
+#                 WHERE rgr.groupname = (SELECT groupname FROM radusergroup rug WHERE rug.username = %s LIMIT 1)
+#                 AND rgr.attribute = 'Tunnel-Private-Group-Id'
+#             """, (vlan_id, mac_address))
 
-            db.commit()
-            cursor.close()
-            db.close()
-            return redirect(url_for('user_list'))
+#             db.commit()
+#             cursor.close()
+#             db.close()
+#             return redirect(url_for('user_list'))
 
-        else:
-            cursor.execute("""
-                SELECT
-                    rc.username AS mac_address,
-                    IFNULL((SELECT value FROM radgroupreply rgr
-                             WHERE rgr.groupname = (SELECT groupname FROM radusergroup rug WHERE rug.username = rc.username LIMIT 1)
-                             AND rgr.attribute = 'Tunnel-Private-Group-Id' LIMIT 1), 'N/A') AS vlan_id,
-                    IFNULL((SELECT value FROM radcheck rch
-                             WHERE rch.username = rc.username AND rch.attribute = 'User-Description' LIMIT 1), 'N/A') AS description
-                FROM radcheck rc
-                WHERE rc.username = %s
-                GROUP BY rc.username;
-            """, (mac_address,))
-            user = cursor.fetchone()
-            cursor.close()
-            db.close()
-            return render_template('edit_user.html', user=user)
-    return "Database Connection Failed"
+#         else:
+#             cursor.execute("""
+#                 SELECT
+#                     rc.username AS mac_address,
+#                     IFNULL((SELECT value FROM radgroupreply rgr
+#                              WHERE rgr.groupname = (SELECT groupname FROM radusergroup rug WHERE rug.username = rc.username LIMIT 1)
+#                              AND rgr.attribute = 'Tunnel-Private-Group-Id' LIMIT 1), 'N/A') AS vlan_id,
+#                     IFNULL((SELECT value FROM radcheck rch
+#                              WHERE rch.username = rc.username AND rch.attribute = 'User-Description' LIMIT 1), 'N/A') AS description
+#                 FROM radcheck rc
+#                 WHERE rc.username = %s
+#                 GROUP BY rc.username;
+#             """, (mac_address,))
+#             user = cursor.fetchone()
+#             cursor.close()
+#             db.close()
+#             return render_template('edit_user.html', user=user)
+#     return "Database Connection Failed"
 
 @app.route('/groups')
 def groups():
@@ -520,6 +539,8 @@ def add_user():
 
         cursor = db.cursor()
         try:
+            db.autocommit = False #Start Transaction
+
             # Check if user already exists
             cursor.execute("SELECT username FROM radcheck WHERE username = %s", (mac_address,))
             if cursor.fetchone():
@@ -530,9 +551,14 @@ def add_user():
             # Insert into radcheck, setting password to MAC address
             cursor.execute("""
                 INSERT INTO radcheck (username, attribute, op, value)
-                VALUES (%s, 'Cleartext-Password', ':=', %s),
-                       (%s, 'User-Description', ':=', %s)
-            """, (mac_address, mac_address, mac_address, description)) # Use mac_address for both username and password
+                VALUES (%s, 'Cleartext-Password', ':=', %s)
+            """, (mac_address, mac_address)) # Use mac_address for both username and password
+
+            # Insert description into rad_description
+            cursor.execute("""
+                INSERT INTO rad_description (username, description)
+                VALUES (%s, %s)
+            """, (mac_address, description))
 
             # Insert into radusergroup with the selected group
             cursor.execute("""
@@ -540,21 +566,24 @@ def add_user():
                 VALUES (%s, %s)
                 """, (mac_address, vlan_id))  # Use vlan_id
 
-            db.commit()
+            db.commit() #Commit transaction
+            db.autocommit = True
             cursor.close()
             db.close()
             return jsonify({'success': True, 'message': 'User added successfully'})
 
         except mysql.connector.Error as err:
             print(f"Database Error: {err}")
-            db.rollback()
+            db.rollback() #Rollback transaction on error.
+            db.autocommit = True
             cursor.close()
             db.close()
             return jsonify({'success': False, 'message': f"Database error: {err}"}), 500
 
         except Exception as e:
             print(f"Error adding user: {e}")
-            db.rollback()
+            db.rollback() #Rollback transaction on error.
+            db.autocommit = True
             cursor.close()
             db.close()
             return jsonify({'success': False, 'message': str(e)}), 500
