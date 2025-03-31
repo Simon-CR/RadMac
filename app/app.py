@@ -30,11 +30,9 @@ def index():
     if db:
         cursor = db.cursor(dictionary=True)
         try:
-            # Count total users
             cursor.execute("SELECT COUNT(DISTINCT username) as total FROM radcheck;")
             total_users = cursor.fetchone()['total']
 
-            # Count total groups
             cursor.execute("SELECT COUNT(DISTINCT groupname) as total FROM radgroupreply;")
             total_groups = cursor.fetchone()['total']
 
@@ -72,11 +70,9 @@ def sql():
     if db:
         cursor = db.cursor(dictionary=True)
         try:
-            # Count total users
             cursor.execute("SELECT COUNT(DISTINCT username) as total FROM radcheck;")
             total_users = cursor.fetchone()['total']
 
-            # Count total groups
             cursor.execute("SELECT COUNT(DISTINCT groupname) as total FROM radgroupreply;")
             total_groups = cursor.fetchone()['total']
 
@@ -90,14 +86,12 @@ def sql():
 
 @app.route('/user_list')
 def user_list():
-    """Displays the user list with VLAN IDs and descriptions from rad_description."""
     db = get_db()
     if db is None:
         return "Database connection failed", 500
 
     cursor = db.cursor(dictionary=True)
     try:
-        # Fetch users, their group assignments, and descriptions from rad_description
         cursor.execute("""
             SELECT 
                 r.username AS mac_address, 
@@ -106,15 +100,14 @@ def user_list():
             FROM radcheck r
             LEFT JOIN radusergroup ug ON r.username = ug.username
             LEFT JOIN rad_description rd ON r.username = rd.username
-        """) #removed WHERE clause
+        """)
         results = cursor.fetchall()
-        print("Results:", results) #added print statement
+        print("Results:", results)
 
-        # Fetch all group names for the dropdown
         cursor.execute("SELECT groupname FROM radgroupcheck")
         groups = cursor.fetchall()
         groups = [{'groupname': row['groupname']} for row in groups]
-        print("Groups:", groups) #added print statement
+        print("Groups:", groups)
 
         cursor.close()
         db.close()
@@ -130,6 +123,9 @@ def update_user():
     mac_address = request.form['mac_address']
     description = request.form['description']
     vlan_id = request.form['vlan_id']
+    new_mac_address = request.form.get('new_mac_address')
+
+    print(f"Update request received: mac_address={mac_address}, description={description}, vlan_id={vlan_id}, new_mac_address={new_mac_address}")
 
     db = get_db()
     if db:
@@ -137,38 +133,81 @@ def update_user():
         try:
             db.autocommit = False
 
-            # Update rad_description table
-            cursor.execute("""
-                UPDATE rad_description
-                SET description = %s
-                WHERE username = %s
-            """, (description, mac_address))
+            if new_mac_address and new_mac_address != mac_address:
+                print("Updating MAC address...")
+                # Update radcheck
+                cursor.execute("""
+                    UPDATE radcheck
+                    SET username = %s, value = %s
+                    WHERE username = %s
+                """, (new_mac_address, new_mac_address, mac_address))
+                print(f"radcheck update affected {cursor.rowcount} rows.")
 
-            # Update radgroupreply table for VLAN ID
-            cursor.execute("""
-                UPDATE radgroupreply rgr
-                SET value = %s
-                WHERE rgr.groupname = (SELECT groupname FROM radusergroup rug WHERE rug.username = %s LIMIT 1)
-                AND rgr.attribute = 'Tunnel-Private-Group-Id'
-            """, (vlan_id, mac_address))
+                # Update rad_description
+                cursor.execute("""
+                    UPDATE rad_description
+                    SET username = %s, description = %s
+                    WHERE username = %s
+                """, (new_mac_address, description, mac_address))
+                print(f"rad_description update affected {cursor.rowcount} rows.")
+
+                # Update radusergroup
+                cursor.execute("""
+                    UPDATE radusergroup
+                    SET username = %s, groupname = %s
+                    WHERE username = %s
+                """, (new_mac_address, vlan_id, mac_address))
+                print(f"radusergroup update affected {cursor.rowcount} rows.")
+
+                mac_address = new_mac_address
+            else:
+                print("Updating description and VLAN...")
+                # Update rad_description
+                cursor.execute("""
+                    UPDATE rad_description
+                    SET description = %s
+                    WHERE username = %s
+                """, (description, mac_address))
+                print(f"rad_description update affected {cursor.rowcount} rows.")
+
+                # Update radusergroup
+                cursor.execute("""
+                    UPDATE radusergroup
+                    SET groupname = %s
+                    WHERE username = %s
+                """, (vlan_id, mac_address))
+                print(f"radusergroup update affected {cursor.rowcount} rows.")
+
+            if cursor.rowcount > 0:
+                print("Database rows were modified.")
+            else:
+                print("Database rows were not modified.")
 
             db.commit()
             db.autocommit = True
             cursor.close()
+            print("Update successful")
             return "success"
+
         except mysql.connector.Error as err:
             db.rollback()
             db.autocommit = True
             cursor.close()
+            print(f"Database Error: {err}")
             return str(err)
+
         except Exception as e:
             db.rollback()
             db.autocommit = True
             cursor.close()
+            print(f"Exception: {e}")
             return str(e)
+
         finally:
             db.close()
-    return "Database Connection Failed"
+    else:
+        print("Database Connection Failed")
+        return "Database Connection Failed"
 
 @app.route('/delete_user/<mac_address>')
 def delete_user(mac_address):
@@ -176,77 +215,25 @@ def delete_user(mac_address):
     if db:
         cursor = db.cursor()
         try:
-            db.autocommit = False #Start transaction
+            db.autocommit = False
 
-            # Delete from rad_description
             cursor.execute("DELETE FROM rad_description WHERE username = %s", (mac_address,))
-
-            # Delete from radcheck
             cursor.execute("DELETE FROM radcheck WHERE username = %s", (mac_address,))
-
-            #Delete from radusergroup
             cursor.execute("DELETE FROM radusergroup WHERE username = %s", (mac_address,))
 
-            db.commit() #Commit transaction
+            db.commit()
             db.autocommit = True
             cursor.close()
             db.close()
             return redirect(url_for('user_list'))
         except mysql.connector.Error as err:
             print(f"Database Error: {err}")
-            db.rollback() #Roll back transaction on error
+            db.rollback()
             db.autocommit = True
             cursor.close()
             db.close()
             return redirect(url_for('user_list'))
     return "Database Connection Failed"
-
-# @app.route('/edit_user/<mac_address>', methods=['GET', 'POST'])
-# def edit_user(mac_address):
-#     db = get_db()
-#     if db:
-#         cursor = db.cursor(dictionary=True)
-
-#         if request.method == 'POST':
-#             description = request.form['description']
-#             vlan_id = request.form['vlan_id']
-
-#             cursor.execute("""
-#                 UPDATE radcheck
-#                 SET value = %s
-#                 WHERE username = %s AND attribute = 'User-Description'
-#             """, (description, mac_address))
-
-#             cursor.execute("""
-#                 UPDATE radgroupreply rgr
-#                 SET value = %s
-#                 WHERE rgr.groupname = (SELECT groupname FROM radusergroup rug WHERE rug.username = %s LIMIT 1)
-#                 AND rgr.attribute = 'Tunnel-Private-Group-Id'
-#             """, (vlan_id, mac_address))
-
-#             db.commit()
-#             cursor.close()
-#             db.close()
-#             return redirect(url_for('user_list'))
-
-#         else:
-#             cursor.execute("""
-#                 SELECT
-#                     rc.username AS mac_address,
-#                     IFNULL((SELECT value FROM radgroupreply rgr
-#                              WHERE rgr.groupname = (SELECT groupname FROM radusergroup rug WHERE rug.username = rc.username LIMIT 1)
-#                              AND rgr.attribute = 'Tunnel-Private-Group-Id' LIMIT 1), 'N/A') AS vlan_id,
-#                     IFNULL((SELECT value FROM radcheck rch
-#                              WHERE rch.username = rc.username AND rch.attribute = 'User-Description' LIMIT 1), 'N/A') AS description
-#                 FROM radcheck rc
-#                 WHERE rc.username = %s
-#                 GROUP BY rc.username;
-#             """, (mac_address,))
-#             user = cursor.fetchone()
-#             cursor.close()
-#             db.close()
-#             return render_template('edit_user.html', user=user)
-#     return "Database Connection Failed"
 
 @app.route('/groups')
 def groups():
@@ -254,13 +241,11 @@ def groups():
     if db:
         cursor = db.cursor()
         try:
-            # Fetch group names from radgroupcheck
             cursor.execute("SELECT DISTINCT groupname FROM radgroupcheck")
             group_names = [row[0] for row in cursor.fetchall()]
 
             grouped_results = {}
             for groupname in group_names:
-                # Fetch attributes for each group from radgroupreply
                 cursor.execute("SELECT id, attribute, op, value FROM radgroupreply WHERE groupname = %s", (groupname,))
                 attributes = cursor.fetchall()
                 grouped_results[groupname] = [{'id': row[0], 'attribute': row[1], 'op': row[2], 'value': row[3]} for row in attributes]
@@ -422,7 +407,6 @@ def add_group():
         try:
             cursor.execute("INSERT INTO radgroupreply (groupname, attribute, op, value) VALUES (%s, '', '', '')", (groupname,))
             cursor.execute("INSERT INTO radusergroup (groupname, username) VALUES (%s, '')", (groupname,))
-            # Add default values for radgroupcheck
             cursor.execute("INSERT INTO radgroupcheck (groupname, attribute, op, value) VALUES (%s, 'Auth-Type', ':=', 'Accept')", (groupname,))
             db.commit()
             cursor.close()
@@ -464,7 +448,7 @@ def delete_group(group_id):
         cursor = db.cursor()
         try:
             cursor.execute("DELETE FROM radgroupreply WHERE id = %s", (group_id,))
-            cursor.execute("DELETE FROM radgroupcheck WHERE id = %s", (group_id,)) # Delete from radgroupcheck
+            cursor.execute("DELETE FROM radgroupcheck WHERE id = %s", (group_id,))
             db.commit()
             cursor.close()
             db.close()
@@ -475,57 +459,12 @@ def delete_group(group_id):
             cursor.close()
             db.close()
             return redirect(url_for('groups'))
-    return "Database Connection Failed"
-
-@app.route('/duplicate_group', methods=['POST'])
-def duplicate_group():
-    groupname = request.form['groupname']
-    db = get_db()
-    if db:
-        cursor = db.cursor()
-        try:
-            cursor.execute("SELECT attribute, op, value FROM radgroupreply WHERE groupname = %s", (groupname,))
-            attributes = [{'attribute': row[0], 'op': row[1], 'value': row[2]} for row in cursor.fetchall()]
-            cursor.close()
-            db.close()
-            return jsonify(attributes)
-        except mysql.connector.Error as err:
-            print(f"Database Error: {err}")
-            cursor.close()
-            db.close()
-            return jsonify([])
-    return jsonify([])
-
-@app.route('/save_duplicated_group', methods=['POST'])
-def save_duplicated_group():
-    data = json.loads(request.data)
-    groupname = data['groupname']
-    attributes = data['attributes']
-    db = get_db()
-    if db:
-        cursor = db.cursor()
-        try:
-            cursor.execute("INSERT INTO radgroupcheck (groupname, attribute, op, value) VALUES (%s, 'Auth-Type', ':=', 'Accept')", (groupname,))
-            cursor.execute("INSERT INTO radusergroup (groupname, username) VALUES (%s, '')", (groupname,))
-            for attribute in attributes:
-                cursor.execute("INSERT INTO radgroupreply (groupname, attribute, op, value) VALUES (%s, %s, %s, %s)", (groupname, attribute['attribute'], attribute['op'], attribute['value']))
-            db.commit()
-            cursor.close()
-            db.close()
-            return "success"
-        except mysql.connector.Error as err:
-            print(f"Database Error: {err}")
-            db.rollback()
-            cursor.close()
-            db.close()
-            return str(err)
     return "Database Connection Failed"
 
 @app.route('/add_user', methods=['POST'])
 def add_user():
-    """Adds a new user to the database."""
     try:
-        data = request.get_json()  # Get the JSON data from the request
+        data = request.get_json()
         mac_address = data.get('mac_address')
         description = data.get('description')
         vlan_id = data.get('vlan_id')
@@ -539,34 +478,30 @@ def add_user():
 
         cursor = db.cursor()
         try:
-            db.autocommit = False #Start Transaction
+            db.autocommit = False
 
-            # Check if user already exists
             cursor.execute("SELECT username FROM radcheck WHERE username = %s", (mac_address,))
             if cursor.fetchone():
                 cursor.close()
                 db.close()
                 return jsonify({'success': False, 'message': 'User with this MAC Address already exists'}), 400
 
-            # Insert into radcheck, setting password to MAC address
             cursor.execute("""
                 INSERT INTO radcheck (username, attribute, op, value)
                 VALUES (%s, 'Cleartext-Password', ':=', %s)
-            """, (mac_address, mac_address)) # Use mac_address for both username and password
+            """, (mac_address, mac_address))
 
-            # Insert description into rad_description
             cursor.execute("""
                 INSERT INTO rad_description (username, description)
                 VALUES (%s, %s)
             """, (mac_address, description))
 
-            # Insert into radusergroup with the selected group
             cursor.execute("""
                 INSERT INTO radusergroup (username, groupname)
                 VALUES (%s, %s)
-                """, (mac_address, vlan_id))  # Use vlan_id
+                """, (mac_address, vlan_id))
 
-            db.commit() #Commit transaction
+            db.commit()
             db.autocommit = True
             cursor.close()
             db.close()
@@ -574,7 +509,7 @@ def add_user():
 
         except mysql.connector.Error as err:
             print(f"Database Error: {err}")
-            db.rollback() #Rollback transaction on error.
+            db.rollback()
             db.autocommit = True
             cursor.close()
             db.close()
@@ -582,7 +517,7 @@ def add_user():
 
         except Exception as e:
             print(f"Error adding user: {e}")
-            db.rollback() #Rollback transaction on error.
+            db.rollback()
             db.autocommit = True
             cursor.close()
             db.close()
@@ -591,57 +526,6 @@ def add_user():
             db.close()
     except Exception as e:
         return jsonify({'success': False, 'message': 'Unknown error'}), 500
-
-@app.route('/duplicate_user', methods=['POST'])
-def duplicate_user():
-    """
-    Retrieves user data (MAC address, description, VLAN ID) from the database
-    based on the provided MAC address.  This data is intended to be used to
-    pre-populate a "duplicate user" form in the frontend.
-    """
-    mac_address = request.form['mac_address']  # Get the MAC address from the POST request.
-
-    db = get_db()  # Get a database connection.
-    if db:
-        cursor = db.cursor(dictionary=True)  # Create a cursor that returns results as dictionaries.
-        try:
-            # Construct the SQL query.  This query retrieves the MAC address,
-            # description, and VLAN ID for the specified user.
-            cursor.execute("""
-                SELECT
-                    rc.username AS mac_address,
-                    IFNULL((SELECT value FROM radgroupreply rgr
-                             WHERE rgr.groupname = (SELECT groupname FROM radusergroup rug WHERE rug.username = rc.username LIMIT 1)
-                             AND rgr.attribute = 'Tunnel-Private-Group-Id' LIMIT 1), 'N/A') AS vlan_id,
-                    IFNULL((SELECT value FROM radcheck rch
-                             WHERE rch.username = rc.username AND rch.attribute = 'User-Description' LIMIT 1), 'N/A') AS description
-                FROM radcheck rc
-                WHERE rc.username = %s  /* %s is a placeholder for the MAC address */
-                GROUP BY rc.username;
-            """, (mac_address,))  # Execute the query with the MAC address as a parameter.
-
-            user_data = cursor.fetchone()  # Fetch the first (and should be only) result.
-            cursor.close()  # Close the cursor.
-            db.close()      # Close the database connection.
-
-            if user_data:
-                # If user data was found, return it as a JSON response.
-                return jsonify(user_data)
-            else:
-                # If no user data was found (e.g., invalid MAC address), return an empty JSON object.
-                return jsonify({})
-
-        except mysql.connector.Error as err:
-            # Handle database errors.  Log the error and return an error message.
-            print(f"Database Error: {err}")
-            cursor.close()
-            db.close()
-            return jsonify({})  #  Return an empty JSON object on error, to avoid crashing.
-
-    else:
-        # Handle the case where the database connection could not be established.
-        return jsonify({})  # Return empty JSON object
-
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)

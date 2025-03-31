@@ -116,18 +116,27 @@
         function updateUser(mac_address) {
             const description = document.getElementById('description-' + mac_address).value;
             const vlan_id = document.getElementById('vlan_id-' + mac_address).value;
+            const new_mac_address = document.getElementById('mac_address-' + mac_address).value;
+
+            console.log("Updating user:", mac_address, description, vlan_id, new_mac_address);
 
             fetch('/update_user', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: `mac_address=${mac_address}&description=${description}&vlan_id=${vlan_id}`
+                body: `mac_address=${mac_address}&description=${description}&vlan_id=${vlan_id}&new_mac_address=${new_mac_address}`
             })
             .then(response => response.text())
             .then(data => {
+                console.log("Server response:", data);
                 if (data === 'success') {
-                    location.reload();
+                    document.getElementById('mac_address-' + mac_address).value = new_mac_address;
+                    document.getElementById('description-' + mac_address).value = description;
+                    document.getElementById('vlan_id-' + mac_address).value = vlan_id;
+                    document.getElementById('mac_address-' + mac_address).id = 'mac_address-' + new_mac_address;
+                    document.getElementById('description-' + mac_address).id = 'description-' + new_mac_address;
+                    document.getElementById('vlan_id-' + mac_address).id = 'vlan_id-' + new_mac_address;
                 } else {
                     alert('Error updating user: ' + data);
                 }
