@@ -17,8 +17,12 @@
         <tbody>
             {% for user in results %}
                 <tr>
-                    <td><input type="text" id="mac_address-{{ user.mac_address }}" value="{{ user.mac_address }}"></td>
-                    <td><input type="text" id="description-{{ user.mac_address }}" value="{{ user.description }}"></td>
+                    <td>
+                        <input type="text" id="mac_address-{{ user.mac_address }}" value="{{ user.mac_address }}" maxlength="12" pattern="^[0-9a-fA-F]{12}$">
+                    </td>
+                    <td>
+                        <input type="text" id="description-{{ user.mac_address }}" value="{{ user.description }}" maxlength="200">
+                    </td>
                     <td>
                         <select id="vlan_id-{{ user.mac_address }}">
                             {% for group in groups %}
@@ -54,8 +58,8 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td><input type="text" id="new-mac"></td>
-                        <td><input type="text" id="new-description"></td>
+                        <td><input type="text" id="new-mac" maxlength="12" pattern="^[0-9a-fA-F]{12}$"></td>
+                        <td><input type="text" id="new-description" maxlength="200"></td>
                         <td>
                             <select id="new-vlan_id">
                                 {% for group in groups %}
@@ -111,15 +115,37 @@
     </style>
 
     <script>
+        // Data from Flask (VLAN groups)
         const groups = {{ groups | tojson | safe }};
 
+        /**
+         * Updates a user's MAC address, description, and VLAN ID.
+         * @param {string} mac_address - The original MAC address of the user.
+         */
         function updateUser(mac_address) {
-            const description = document.getElementById('description-' + mac_address).value;
+            const descriptionInput = document.getElementById('description-' + mac_address);
+            const macInput = document.getElementById('mac_address-' + mac_address);
             const vlan_id = document.getElementById('vlan_id-' + mac_address).value;
-            const new_mac_address = document.getElementById('mac_address-' + mac_address).value;
+            const new_mac_address = macInput.value;
+            const description = descriptionInput.value;
+
+            // Client-side validation for MAC address
+            if (new_mac_address.length !== 12 || !/^[0-9a-fA-F]{12}$/.test(new_mac_address)) {
+                alert("MAC Address must be 12 hexadecimal characters.");
+                macInput.focus();
+                return;
+            }
+
+            // Client-side validation for description
+            if (description.length > 200) {
+                alert("Description must be 200 characters or less.");
+                descriptionInput.focus();
+                return;
+            }
 
             console.log("Updating user:", mac_address, description, vlan_id, new_mac_address);
 
+            // Send update request to server
             fetch('/update_user', {
                 method: 'POST',
                 headers: {
@@ -131,11 +157,12 @@
             .then(data => {
                 console.log("Server response:", data);
                 if (data === 'success') {
-                    document.getElementById('mac_address-' + mac_address).value = new_mac_address;
-                    document.getElementById('description-' + mac_address).value = description;
+                    // Update UI on success
+                    macInput.value = new_mac_address;
+                    descriptionInput.value = description;
                     document.getElementById('vlan_id-' + mac_address).value = vlan_id;
-                    document.getElementById('mac_address-' + mac_address).id = 'mac_address-' + new_mac_address;
-                    document.getElementById('description-' + mac_address).id = 'description-' + new_mac_address;
+                    macInput.id = 'mac_address-' + new_mac_address;
+                    descriptionInput.id = 'description-' + new_mac_address;
                     document.getElementById('vlan_id-' + mac_address).id = 'vlan_id-' + new_mac_address;
                 } else {
                     alert('Error updating user: ' + data);
@@ -143,10 +170,16 @@
             });
         }
 
+        /**
+         * Saves the current scroll position in session storage.
+         */
         function saveScrollPosition() {
             sessionStorage.setItem('scrollPosition', window.scrollY);
         }
 
+        /**
+         * Restores the scroll position from session storage on page load.
+         */
         window.onload = function () {
             const scrollPosition = sessionStorage.getItem('scrollPosition');
             if (scrollPosition) {
@@ -155,28 +188,48 @@
             }
         }
 
+        /**
+         * Opens the "Add User" dialog.
+         */
         function addNewUserRow() {
             document.getElementById('add-user-dialog').showModal();
         }
 
+        // Close dialog on cancel button click
         document.getElementById('cancel-add-user-dialog').addEventListener('click', () => {
             document.getElementById('add-user-dialog').close();
         });
 
+        // Save new user on save button click
         document.getElementById('save-new-user').addEventListener('click', () => {
             saveNewUser();
         });
 
+        /**
+         * Saves a new user to the database.
+         */
         function saveNewUser() {
-            const mac = document.getElementById('new-mac').value;
-            const description = document.getElementById('new-description').value;
+            const macInput = document.getElementById('new-mac');
+            const descriptionInput = document.getElementById('new-description');
             const vlan_id = document.getElementById('new-vlan_id').value;
+            const mac = macInput.value;
+            const description = descriptionInput.value;
 
-            if (!mac) {
-                alert('MAC Address cannot be empty.');
+            // Client-side validation for MAC address
+            if (mac.length !== 12 || !/^[0-9a-fA-F]{12}$/.test(mac)) {
+                alert("MAC Address must be 12 hexadecimal characters.");
+                macInput.focus();
                 return;
             }
 
+            // Client-side validation for description
+            if (description.length > 200) {
+                alert("Description must be 200 characters or less.");
+                descriptionInput.focus();
+                return;
+            }
+
+            // Send add user request to server
             fetch('/add_user', {
                 method: 'POST',
                 headers: {
@@ -195,7 +248,7 @@
             .then(data => {
                 if (data && data.success) {
                     document.getElementById('add-user-dialog').close();
-                    location.reload();
+                    location.reload(); // Refresh the page to show the new user
                 } else {
                     alert('Error adding user: ' + (data && data.message ? data.message : 'Unknown error'));
                 }
