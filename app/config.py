@@ -1,15 +1,20 @@
 import os
 
 class Config:
-    """Base configuration."""
     DEBUG = False
     TESTING = False
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'default-insecure-key')
+
+    # Logging
+    LOG_TO_FILE = os.getenv('LOG_TO_FILE', 'false').lower() == 'true'
+    LOG_FILE_PATH = os.getenv('LOG_FILE_PATH', '/app/logs/app.log')
+
+    # MAC Lookup API
     OUI_API_URL = os.getenv('OUI_API_URL', 'https://api.maclookup.app/v2/macs/{}')
     OUI_API_KEY = os.getenv('OUI_API_KEY', '')
     OUI_API_LIMIT_PER_SEC = int(os.getenv('OUI_API_LIMIT_PER_SEC', '2'))
-    OUI_API_DAILY_LIMIT = int(os.getenv('OUI_API_DAILY_LIMIT', '10000'))    
+    OUI_API_DAILY_LIMIT = int(os.getenv('OUI_API_DAILY_LIMIT', '10000')) 
 
 class DevelopmentConfig(Config):
     """Development configuration."""

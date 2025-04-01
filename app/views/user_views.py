@@ -228,9 +228,9 @@ def refresh_vendors():
     db = get_db()
     cursor = db.cursor(dictionary=True)
 
-    api_url = os.getenv('MACLOOKUP_API_URL', 'https://api.maclookup.app/v2/macs/{}').strip('"')
-    api_key = os.getenv('MACLOOKUP_API_KEY', '').strip('"')
-    limit = int(os.getenv('MACLOOKUP_RATE_LIMIT', 2))
+    api_url = os.getenv('OUI_API_API_URL', 'https://api.maclookup.app/v2/macs/{}').strip('"')
+    api_key = os.getenv('OUI_API_API_KEY', '').strip('"')
+    limit = int(os.getenv('OUI_API_RATE_LIMIT', 2))
     headers = {'Authorization': f'Bearer {api_key}'} if api_key else {}
 
     cursor.execute("""

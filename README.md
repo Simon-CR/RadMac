@@ -20,16 +20,21 @@ A lightweight web UI to manage MAC address-based FreeRADIUS configurations backe
 Add the following tables to your RADIUS database:
 
 ```sql
-CREATE TABLE IF NOT EXISTS rad_description (
-    username VARCHAR(64) PRIMARY KEY,
-    description TEXT
-);
+CREATE TABLE `rad_description` (
+  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
+  `username` char(12) DEFAULT NULL,
+  `description` varchar(200) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-CREATE TABLE IF NOT EXISTS mac_vendor_cache (
-    mac_prefix VARCHAR(6) PRIMARY KEY,
-    vendor_name VARCHAR(255),
-    last_updated TIMESTAMP
-);
+CREATE TABLE `mac_vendor_cache` (
+  `mac_prefix` varchar(6) NOT NULL,
+  `vendor_name` varchar(255) DEFAULT NULL,
+  `status` enum('found','not_found') DEFAULT 'found',
+  `last_checked` datetime DEFAULT current_timestamp(),
+  `last_updated` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`mac_prefix`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 ```
 
 ---
