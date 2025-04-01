@@ -4,3 +4,4 @@ requests
 BeautifulSoup4
 lxml
 gunicorn
+pytz

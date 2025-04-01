@@ -4,21 +4,24 @@ from views.user_views import user
 from views.group_views import group
 from config import app_config
 from database import init_app
-import os, logging
+
+import logging, os
 from logging.handlers import RotatingFileHandler
 
-if app.config['LOG_TO_FILE']:
-    handler = RotatingFileHandler(app.config['LOG_FILE_PATH'], maxBytes=1000000, backupCount=3)
+app = Flask(__name__)
+app.config.from_object(app_config)
+init_app(app)
+
+if app.config.get('LOG_TO_FILE'):
+    log_file = app.config.get('LOG_FILE_PATH', '/app/logs/app.log')
+    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    handler = RotatingFileHandler(log_file, maxBytes=1_000_000, backupCount=3)
     handler.setLevel(logging.INFO)
     app.logger.addHandler(handler)
 
 app.logger.setLevel(logging.INFO)
 
-app = Flask(__name__)
-app.config.from_object(app_config)
-
-init_app(app)
-
+# Route setup
 app.register_blueprint(index)
 app.register_blueprint(user, url_prefix='/user')
 app.register_blueprint(group, url_prefix='/group')
@@ -34,6 +37,3 @@ def legacy_group_list():
 @app.route('/')
 def index_redirect():
     return render_template('index.html')
-
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8080)

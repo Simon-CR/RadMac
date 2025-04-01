@@ -1,4 +1,4 @@
-import os
+import os, pytz
 
 class Config:
     DEBUG = False
@@ -15,6 +15,10 @@ class Config:
     OUI_API_KEY = os.getenv('OUI_API_KEY', '')
     OUI_API_LIMIT_PER_SEC = int(os.getenv('OUI_API_LIMIT_PER_SEC', '2'))
     OUI_API_DAILY_LIMIT = int(os.getenv('OUI_API_DAILY_LIMIT', '10000')) 
+
+    # Timezone
+    APP_TIMEZONE = os.getenv('APP_TIMEZONE', 'UTC')
+    TZ = pytz.timezone(APP_TIMEZONE)
 
 class DevelopmentConfig(Config):
     """Development configuration."""

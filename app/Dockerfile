@@ -3,21 +3,30 @@ FROM python:3.9-slim
 # Set working directory
 WORKDIR /app
 
-# Create logs directory
+# Optional: Set timezone via build argument (can override in docker-compose)
+ARG TIMEZONE=UTC
+ENV TZ=$TIMEZONE
+
+# Install tzdata and optional tools
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends tzdata iputils-ping telnet && \
+    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
+    echo $TZ > /etc/timezone && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create logs directory (used if LOG_TO_FILE=true)
 RUN mkdir -p /app/logs
 
-# Install dependencies
+# Copy dependencies and install
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Optional tools (useful for debugging)
-RUN apt-get update && apt-get install -y iputils-ping telnet && apt-get clean
 
 # Copy application code
 COPY . .
 
-# Expose port (optional, for documentation)
+# Expose internal port (Gunicorn default)
 EXPOSE 8080
 
-# Default command to run app with Gunicorn
+# Run the app via Gunicorn
 CMD ["gunicorn", "--bind", "0.0.0.0:8080", "wsgi:app"]

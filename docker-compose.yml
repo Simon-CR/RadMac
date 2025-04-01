@@ -1,19 +1,21 @@
-version: '3.8'
+---
 
 services:
   app:
     build:
       context: ./app
       dockerfile: Dockerfile
+      args:
+        TIMEZONE: ${APP_TIMEZONE}
     volumes:
       - ./app:/app
     env_file:
       - .env
     environment:
-      - FLASK_APP=app.py
-      - FLASK_ENV=development
+      - FLASK_APP=wsgi:app
+      - FLASK_ENV=production
       - PYTHONPATH=/app
-    restart: no
+    restart: unless-stopped
 
   nginx:
     build:
@@ -23,4 +25,4 @@ services:
       - "8080:80"
     depends_on:
       - app
-    restart: always
+    restart: unless-stopped

@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify
 from database import get_db
+from pytz import timezone
 from datetime import datetime
 import requests
 
@@ -8,9 +9,15 @@ OUI_API_URL = 'https://api.maclookup.app/v2/macs/{}'
 
 
 def time_ago(dt):
-    now = datetime.now()
-    diff = now - dt
+    from config import LOCAL_TZ
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=pytz.UTC)
+    local_dt = dt.astimezone(LOCAL_TZ)
+
+    now = datetime.now(LOCAL_TZ)
+    diff = now - local_dt
     seconds = int(diff.total_seconds())
+
     if seconds < 60:
         return f"{seconds}s ago"
     elif seconds < 3600:
