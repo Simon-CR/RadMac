@@ -3,3 +3,4 @@ mysql-connector-python
 requests
 BeautifulSoup4
 lxml
+gunicorn

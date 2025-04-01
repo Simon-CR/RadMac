@@ -4,6 +4,19 @@ from views.user_views import user
 from views.group_views import group
 from config import app_config
 from database import init_app
+import logging
+from logging.handlers import RotatingFileHandler
+import os
+
+log_to_file = os.getenv('LOG_TO_FILE', 'false').lower() == 'true'
+log_file_path = os.getenv('LOG_FILE_PATH', '/app/logs/app.log')
+
+if log_to_file:
+    handler = RotatingFileHandler(log_file_path, maxBytes=1000000, backupCount=3)
+    handler.setLevel(logging.INFO)
+    app.logger.addHandler(handler)
+
+app.logger.setLevel(logging.INFO)
 
 app = Flask(__name__)
 app.config.from_object(app_config)

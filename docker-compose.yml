@@ -19,6 +19,8 @@ services:
       - MACLOOKUP_RATE_LIMIT=2
       - MACLOOKUP_API_KEY=""  # if using a key later
       - MACLOOKUP_API_URL="https://api.maclookup.app/v2/macs/{}"
+      - LOG_TO_FILE=true
+      - LOG_FILE_PATH=/app/logs/app.log
     restart: no
 
   nginx:
