@@ -16,9 +16,14 @@ class Config:
     OUI_API_LIMIT_PER_SEC = int(os.getenv('OUI_API_LIMIT_PER_SEC', '2'))
     OUI_API_DAILY_LIMIT = int(os.getenv('OUI_API_DAILY_LIMIT', '10000')) 
 
-    # Timezone
-    APP_TIMEZONE = os.getenv('APP_TIMEZONE', 'UTC')
-    TZ = pytz.timezone(APP_TIMEZONE)
+    # These get set in __init__
+    APP_TIMEZONE = 'UTC'
+    TZ = pytz.utc
+
+    def __init__(self):
+        tz_name = os.getenv('APP_TIMEZONE', 'UTC')
+        self.APP_TIMEZONE = tz_name
+        self.TZ = pytz.timezone(tz_name)
 
 class DevelopmentConfig(Config):
     """Development configuration."""

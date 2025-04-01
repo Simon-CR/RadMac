@@ -1,23 +1,31 @@
 from flask import Blueprint, render_template, request, jsonify
 from database import get_db
-from pytz import timezone
 from datetime import datetime
-import requests
+import requests, pytz
 
 index = Blueprint('index', __name__)
 OUI_API_URL = 'https://api.maclookup.app/v2/macs/{}'
 
 
+import pytz  # make sure it's imported if not already
+
 def time_ago(dt):
-    from config import LOCAL_TZ
+    if not dt:
+        return "n/a"
+
+    tz_name = current_app.config.get('APP_TIMEZONE', 'UTC')
+    local_tz = current_app.config.get('TZ', pytz.utc)
+
+    # Only assign UTC tzinfo if naive
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=pytz.UTC)
-    local_dt = dt.astimezone(LOCAL_TZ)
+        dt = dt.replace(tzinfo=pytz.utc)
 
-    now = datetime.now(LOCAL_TZ)
-    diff = now - local_dt
+    # Convert to app timezone
+    dt = dt.astimezone(local_tz)
+    now = datetime.now(local_tz)
+    diff = now - dt
+
     seconds = int(diff.total_seconds())
-
     if seconds < 60:
         return f"{seconds}s ago"
     elif seconds < 3600:
@@ -26,6 +34,7 @@ def time_ago(dt):
         return f"{seconds//3600}h{(seconds%3600)//60}m ago"
     else:
         return f"{seconds//86400}d{(seconds%86400)//3600}h ago"
+
 
 
 def lookup_vendor(mac):
