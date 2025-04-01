@@ -32,7 +32,7 @@ def user_list():
 
         cursor.close()
         db.close()
-        return render_template('user_list_inline_edit.html', results=results, groups=groups)
+        return render_template('user_list.html', results=results, groups=groups)
 
     except mysql.connector.Error as e:
         print(f"Database error: {e}")

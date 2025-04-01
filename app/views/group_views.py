@@ -24,13 +24,13 @@ def groups():
 
             cursor.close()
             db.close()
-            return render_template('group_list_nested.html', grouped_results=grouped_results)
+            return render_template('group_list.html', grouped_results=grouped_results)
 
         except mysql.connector.Error as err:
             print(f"Database Error: {err}")
             cursor.close()
             db.close()
-            return render_template('group_list_nested.html', grouped_results={})
+            return render_template('group_list.html', grouped_results={})
     return "Database Connection Failed"
 
 @group.route('/save_group', methods=['POST'])
