@@ -1,0 +1,33 @@
+import os
+
+class Config:
+    """Base configuration."""
+    DEBUG = False
+    TESTING = False
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'default-insecure-key')
+    OUI_API_URL = os.getenv('OUI_API_URL', 'https://api.maclookup.app/v2/macs/{}')
+    OUI_API_KEY = os.getenv('OUI_API_KEY', '')
+    OUI_API_LIMIT_PER_SEC = int(os.getenv('OUI_API_LIMIT_PER_SEC', '2'))
+    OUI_API_DAILY_LIMIT = int(os.getenv('OUI_API_DAILY_LIMIT', '10000'))    
+
+class DevelopmentConfig(Config):
+    """Development configuration."""
+    DEBUG = True
+    MYSQL_HOST = os.getenv('MYSQL_HOST', '192.168.60.150')
+    MYSQL_USER = os.getenv('MYSQL_USER', 'user_92z0Kj')
+    MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', '5B3UXZV8vyrB')
+    MYSQL_DATABASE = os.getenv('MYSQL_DATABASE', 'radius_NIaIuT')
+
+class ProductionConfig(Config):
+    """Production configuration."""
+    MYSQL_HOST = os.getenv('MYSQL_HOST')
+    MYSQL_USER = os.getenv('MYSQL_USER')
+    MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD')
+    MYSQL_DATABASE = os.getenv('MYSQL_DATABASE')
+
+# Use the correct config based on environment
+if os.getenv('FLASK_ENV') == 'production':
+    app_config = ProductionConfig
+else:
+    app_config = DevelopmentConfig

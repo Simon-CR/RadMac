@@ -1,262 +1,179 @@
 {% extends 'base.html' %}
-
 {% block title %}User List{% endblock %}
 
 {% block content %}
-    <h1>User List</h1>
+<h1 class="page-title">User List</h1>
 
-    <table border="1">
-        <thead>
-            <tr>
-                <th>MAC Address</th>
-                <th>Description</th>
-                <th>VLAN ID</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for user in results %}
-                <tr>
-                    <td>
-                        <input type="text" id="mac_address-{{ user.mac_address }}" value="{{ user.mac_address }}" maxlength="12" pattern="^[0-9a-fA-F]{12}$">
-                    </td>
-                    <td>
-                        <input type="text" id="description-{{ user.mac_address }}" value="{{ user.description }}" maxlength="200">
-                    </td>
-                    <td>
-                        <select id="vlan_id-{{ user.mac_address }}">
-                            {% for group in groups %}
-                                <option value="{{ group.groupname }}" {% if user.vlan_id == group.groupname %} selected {% endif %}>
-                                    {{ group.groupname }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </td>
-                    <td>
-                        <button onclick="updateUser('{{ user.mac_address }}')">✅</button>
-                        <a href="/delete_user/{{ user.mac_address }}" onclick="saveScrollPosition()">🗑️</a>
-                    </td>
-                </tr>
-            {% endfor %}
-            <tr>
-                <td colspan="4">
-                    <button onclick="addNewUserRow()">➕ Add User</button>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+<table class="styled-table fade-in">
+  <thead>
+    <tr>
+      <th>MAC Address</th>
+      <th>
+        Vendor
+        <button class="icon-button" onclick="refreshVendors(this)" title="Refresh Vendor">🔄</button>
+      </th>
+      <th>Description</th>
+      <th>Group</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody id="user-body">
+    <!-- New User Row -->
+    <tr class="new-row">
+      <td><input type="text" id="new-mac" placeholder="MAC address"></td>
+      <td><em>(auto)</em></td>
+      <td><input type="text" id="new-description" placeholder="Description"></td>
+      <td>
+        <select id="new-vlan">
+          <option value="">-- Select Group --</option>
+          {% for group in groups %}
+            <option value="{{ group.groupname }}">{{ group.groupname }}</option>
+          {% endfor %}
+        </select>
+      </td>
+      <td>
+        <button class="icon-button pulse" onclick="addUser()" title="Save User">💾</button>
+        <button class="icon-button" onclick="clearUserFields()" title="Reset">❌</button>
+      </td>
+    </tr>
 
-    <dialog id="add-user-dialog">
-        <div id="add-user-dialog-content">
-            <table border="1">
-                <thead>
-                    <tr>
-                        <th>MAC Address</th>
-                        <th>Description</th>
-                        <th>VLAN ID</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><input type="text" id="new-mac" maxlength="12" pattern="^[0-9a-fA-F]{12}$"></td>
-                        <td><input type="text" id="new-description" maxlength="200"></td>
-                        <td>
-                            <select id="new-vlan_id">
-                                {% for group in groups %}
-                                    <option value="{{ group.groupname }}">
-                                        {{ group.groupname }}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
-            <button id="cancel-add-user-dialog">Cancel</button>
-            <button id="save-new-user">Save</button>
-        </div>
-    </dialog>
+    {% for row in results %}
+    <tr>
+      <td><input type="text" value="{{ row.mac_address }}" id="mac-{{ loop.index }}" disabled></td>
+      <td>{{ row.vendor or 'Unknown Vendor' }}</td>
+      <td><input type="text" value="{{ row.description }}" id="desc-{{ loop.index }}"></td>
+      <td>
+        <select id="vlan-{{ loop.index }}">
+          {% for group in groups %}
+            <option value="{{ group.groupname }}" {% if group.groupname == row.vlan_id %}selected{% endif %}>
+              {{ group.groupname }}
+            </option>
+          {% endfor %}
+        </select>
+      </td>
+      <td>
+        <button class="icon-button" onclick="enableUserEdit({{ loop.index }})" title="Edit">✏️</button>
+        <button class="icon-button" onclick="updateUser({{ loop.index }}, '{{ row.mac_address }}')" title="Save">💾</button>
+        <button class="icon-button" onclick="location.reload()" title="Cancel">❌</button>
+        <a class="icon-button" href="/user/delete_user/{{ row.mac_address }}" onclick="saveScrollPosition()" title="Delete">🗑️</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 
-    <style>
-        #cancel-add-user-dialog {
-            border-radius: 5px;
-            padding: 10px;
-            background-color: #f44336;
-            color: white;
-            border: none;
-            cursor: pointer;
-            margin-right: 10px;
+<script>
+function enableUserEdit(index) {
+  const input = document.getElementById(`mac-${index}`);
+  input.disabled = false;
+  input.focus();
+}
+
+function clearUserFields() {
+  document.getElementById("new-mac").value = "";
+  document.getElementById("new-description").value = "";
+  document.getElementById("new-vlan").selectedIndex = 0;
+}
+
+function addUser() {
+  const mac = document.getElementById("new-mac").value;
+  const desc = document.getElementById("new-description").value;
+  const vlan = document.getElementById("new-vlan").value;
+
+  if (!mac || !vlan) {
+    showToast("MAC address and group are required.");
+    return;
+  }
+
+  fetch("/user/add_user", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mac_address: mac, description: desc, vlan_id: vlan })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      showToast("User added.");
+      setTimeout(() => location.reload(), 800);
+    } else {
+      showToast("Error: " + data.message);
+    }
+  });
+}
+
+function updateUser(index, originalMac) {
+  const macInput = document.getElementById(`mac-${index}`);
+  const desc = document.getElementById(`desc-${index}`).value;
+  const vlan = document.getElementById(`vlan-${index}`).value;
+
+  fetch("/user/update_user", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `mac_address=${originalMac}&new_mac_address=${macInput.value}&description=${desc}&vlan_id=${vlan}`
+  })
+  .then(res => res.text())
+  .then(data => {
+    if (data === "success") {
+      showToast("User updated.");
+      setTimeout(() => location.reload(), 800);
+    } else {
+      showToast("Update failed: " + data);
+    }
+  });
+}
+
+// function refreshVendors() {
+//   showToast("Refreshing vendor info...");
+//   fetch("/user/refresh_vendors", {
+//     method: "POST"
+//   })
+//   .then(res => res.json())
+//   .then(data => {
+//     showToast(data.message || "Refreshed.");
+//     setTimeout(() => location.reload(), 1200);
+//   })
+//   .catch(() => showToast("Failed to refresh vendor info."));
+// }
+
+function refreshVendors(btn) {
+  btn.disabled = true;
+  showToast("Refreshing vendor info...");
+
+  function refreshCycle() {
+    fetch("/user/refresh_vendors", { method: "POST" })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          showToast(`Updated ${data.updated} vendors`);
+          if (data.remaining) {
+            setTimeout(refreshCycle, 1500);  // Pause before next batch
+          } else {
+            showToast("Vendor refresh complete.");
+            setTimeout(() => location.reload(), 1000);
+          }
+        } else {
+          showToast("Refresh failed: " + data.message);
         }
+      })
+      .catch(err => {
+        console.error(err);
+        showToast("Error during vendor refresh.");
+      });
+  }
 
-        #cancel-add-user-dialog:hover {
-            background-color: #d32f2f;
-        }
+  refreshCycle();
+}
 
-        #save-new-user {
-            border-radius: 5px;
-            padding: 10px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
+function saveScrollPosition() {
+  sessionStorage.setItem("scrollPosition", window.scrollY);
+}
 
-        #save-new-user:hover {
-            background-color: #45a049;
-        }
-
-        #add-user-dialog-content + div {
-            display: flex;
-            justify-content: flex-end;
-            margin-top: 10px;
-        }
-    </style>
-
-    <script>
-        // Data from Flask (VLAN groups)
-        const groups = {{ groups | tojson | safe }};
-
-        /**
-         * Updates a user's MAC address, description, and VLAN ID.
-         * @param {string} mac_address - The original MAC address of the user.
-         */
-        function updateUser(mac_address) {
-            const descriptionInput = document.getElementById('description-' + mac_address);
-            const macInput = document.getElementById('mac_address-' + mac_address);
-            const vlan_id = document.getElementById('vlan_id-' + mac_address).value;
-            const new_mac_address = macInput.value;
-            const description = descriptionInput.value;
-
-            // Client-side validation for MAC address
-            if (new_mac_address.length !== 12 || !/^[0-9a-fA-F]{12}$/.test(new_mac_address)) {
-                alert("MAC Address must be 12 hexadecimal characters.");
-                macInput.focus();
-                return;
-            }
-
-            // Client-side validation for description
-            if (description.length > 200) {
-                alert("Description must be 200 characters or less.");
-                descriptionInput.focus();
-                return;
-            }
-
-            console.log("Updating user:", mac_address, description, vlan_id, new_mac_address);
-
-            // Send update request to server
-            fetch('/update_user', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `mac_address=${mac_address}&description=${description}&vlan_id=${vlan_id}&new_mac_address=${new_mac_address}`
-            })
-            .then(response => response.text())
-            .then(data => {
-                console.log("Server response:", data);
-                if (data === 'success') {
-                    // Update UI on success
-                    macInput.value = new_mac_address;
-                    descriptionInput.value = description;
-                    document.getElementById('vlan_id-' + mac_address).value = vlan_id;
-                    macInput.id = 'mac_address-' + new_mac_address;
-                    descriptionInput.id = 'description-' + new_mac_address;
-                    document.getElementById('vlan_id-' + mac_address).id = 'vlan_id-' + new_mac_address;
-                } else {
-                    alert('Error updating user: ' + data);
-                }
-            });
-        }
-
-        /**
-         * Saves the current scroll position in session storage.
-         */
-        function saveScrollPosition() {
-            sessionStorage.setItem('scrollPosition', window.scrollY);
-        }
-
-        /**
-         * Restores the scroll position from session storage on page load.
-         */
-        window.onload = function () {
-            const scrollPosition = sessionStorage.getItem('scrollPosition');
-            if (scrollPosition) {
-                window.scrollTo(0, scrollPosition);
-                sessionStorage.removeItem('scrollPosition');
-            }
-        }
-
-        /**
-         * Opens the "Add User" dialog.
-         */
-        function addNewUserRow() {
-            document.getElementById('add-user-dialog').showModal();
-        }
-
-        // Close dialog on cancel button click
-        document.getElementById('cancel-add-user-dialog').addEventListener('click', () => {
-            document.getElementById('add-user-dialog').close();
-        });
-
-        // Save new user on save button click
-        document.getElementById('save-new-user').addEventListener('click', () => {
-            saveNewUser();
-        });
-
-        /**
-         * Saves a new user to the database.
-         */
-        function saveNewUser() {
-            const macInput = document.getElementById('new-mac');
-            const descriptionInput = document.getElementById('new-description');
-            const vlan_id = document.getElementById('new-vlan_id').value;
-            const mac = macInput.value;
-            const description = descriptionInput.value;
-
-            // Client-side validation for MAC address
-            if (mac.length !== 12 || !/^[0-9a-fA-F]{12}$/.test(mac)) {
-                alert("MAC Address must be 12 hexadecimal characters.");
-                macInput.focus();
-                return;
-            }
-
-            // Client-side validation for description
-            if (description.length > 200) {
-                alert("Description must be 200 characters or less.");
-                descriptionInput.focus();
-                return;
-            }
-
-            // Send add user request to server
-            fetch('/add_user', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ mac_address: mac, description: description, vlan_id: vlan_id }),
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return response.text().then(text => {
-                        throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
-                    });
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data && data.success) {
-                    document.getElementById('add-user-dialog').close();
-                    location.reload(); // Refresh the page to show the new user
-                } else {
-                    alert('Error adding user: ' + (data && data.message ? data.message : 'Unknown error'));
-                }
-            })
-            .catch(error => {
-                console.error('Fetch error:', error);
-                alert('Error adding user: ' + error.message);
-            });
-        }
-    </script>
+window.onload = function () {
+  const scroll = sessionStorage.getItem("scrollPosition");
+  if (scroll) {
+    window.scrollTo(0, parseInt(scroll) - 100);
+    sessionStorage.removeItem("scrollPosition");
+  }
+};
+</script>
 {% endblock %}

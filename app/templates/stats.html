@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block title %}Authentication Stats{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Authentication Stats</h1>
+
+<div class="stats-container">
+  <div class="card success-card">
+    <h2>Last Access-Accept Events</h2>
+    <table class="styled-table small-table">
+      <thead>
+        <tr>
+          <th>MAC Address</th>
+          <th>Description</th>
+          <th>Vendor</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in accept_entries %}
+        <tr>
+          <td>{{ entry.username }}</td>
+          <td>{{ entry.description or '' }}</td>
+          <td>{{ entry.vendor }}</td>
+          <td>{{ entry.ago }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card error-card">
+    <h2>Last Access-Reject Events</h2>
+    <table class="styled-table small-table">
+      <thead>
+        <tr>
+          <th>MAC Address</th>
+          <th>Description</th>
+          <th>Vendor</th>
+          <th>Time</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in reject_entries %}
+        <tr>
+          <td>{{ entry.username }}</td>
+          <td>{{ entry.description or '' }}</td>
+          <td>{{ entry.vendor }}</td>
+          <td>{{ entry.ago }}</td>
+          <td>
+            {% if entry.already_exists %}
+              <span style="color: limegreen;">Already exists in {{ entry.existing_vlan or 'unknown VLAN' }}</span>
+            {% else %}
+              <form method="POST" action="/user/add_from_reject" style="display: flex; gap: 4px;">
+                <input type="hidden" name="username" value="{{ entry.username }}">
+                <select name="groupname" required>
+                  <option value="">Select VLAN</option>
+                  {% for group in available_groups %}
+                  <option value="{{ group }}">{{ group }}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" title="Add User">💾</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<style>
+.stats-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+}
+.card {
+  flex: 1;
+  min-width: 45%;
+  padding: 1rem;
+  border-radius: 8px;
+  background-color: var(--card-bg);
+  color: var(--fg);
+  box-shadow: 0 0 10px rgba(0,0,0,0.2);
+}
+.success-card {
+  border-left: 6px solid limegreen;
+}
+.error-card {
+  border-left: 6px solid crimson;
+}
+.styled-table.small-table td, .styled-table.small-table th {
+  padding: 6px;
+  font-size: 0.9rem;
+}
+</style>
+{% endblock %}

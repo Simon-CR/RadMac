@@ -1,4 +1,4 @@
----
+version: '3.8'
 
 services:
   app:
@@ -10,6 +10,16 @@ services:
     environment:
       - FLASK_APP=app.py
       - FLASK_ENV=development
+      - MYSQL_HOST=192.168.60.150
+      - MYSQL_USER=user_92z0Kj
+      - MYSQL_PASSWORD=5B3UXZV8vyrB
+      - MYSQL_DATABASE=radius_NIaIuT
+      - FLASK_SECRET_KEY=default-insecure-key
+      - PYTHONPATH=/app
+      - MACLOOKUP_RATE_LIMIT=2
+      - MACLOOKUP_API_KEY=""  # if using a key later
+      - MACLOOKUP_API_URL="https://api.maclookup.app/v2/macs/{}"
+    restart: no
 
   nginx:
     build:
@@ -19,3 +29,4 @@ services:
       - "8080:80"
     depends_on:
       - app
+    restart: always
