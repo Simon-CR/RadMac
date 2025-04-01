@@ -5,7 +5,7 @@ from views.group_views import group
 from config import app_config as config_class
 from database import init_app
 
-import logging, os
+import logging, os, pytz
 from logging.handlers import RotatingFileHandler
 
 # Instantiate config class
@@ -13,7 +13,10 @@ app_config = config_class()
 
 app = Flask(__name__)
 app.config.from_object(app_config)
+app.config['TZ'] = pytz.timezone(app.config['APP_TIMEZONE'])
 init_app(app)
+
+app.config['TZ'] = pytz.timezone(app.config['APP_TIMEZONE'])
 
 # Logging
 if app.config.get('LOG_TO_FILE'):

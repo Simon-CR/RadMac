@@ -1,0 +1,4 @@
+ATTRIBUTE   User-Name                       1   string
+ATTRIBUTE   Tunnel-Type                    64  integer
+ATTRIBUTE   Tunnel-Medium-Type             65  integer
+ATTRIBUTE   Tunnel-Private-Group-Id        81  string

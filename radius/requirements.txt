@@ -1,0 +1,2 @@
+pyrad
+mysql-connector-python

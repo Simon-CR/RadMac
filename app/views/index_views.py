@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, current_app
 from database import get_db
 from datetime import datetime
 import requests, pytz
@@ -13,14 +13,14 @@ def time_ago(dt):
     if not dt:
         return "n/a"
 
-    tz_name = current_app.config.get('APP_TIMEZONE', 'UTC')
     local_tz = current_app.config.get('TZ', pytz.utc)
 
-    # Only assign UTC tzinfo if naive
+    # If the DB datetime is naive, assume it's already in local server time
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=pytz.utc)
+        server_tz = pytz.timezone('America/Toronto')  # Or your DB server's real timezone
+        dt = server_tz.localize(dt)
 
-    # Convert to app timezone
+    # Convert to the app's configured timezone (from .env)
     dt = dt.astimezone(local_tz)
     now = datetime.now(local_tz)
     diff = now - dt

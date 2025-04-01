@@ -1,6 +1,50 @@
 ---
 
 services:
+
+  db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: radius
+      MYSQL_USER: radiususer
+      MYSQL_PASSWORD: radiuspass
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./db/conf.d:/etc/mysql/conf.d
+      - ./db/init:/docker-entrypoint-initdb.d
+    ports:
+      - "3306:3306"  # Exposed for dev access
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+services:
+  radius:
+    build:
+      context: ./radius
+      dockerfile: Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "1812:1812/udp"
+    restart: unless-stopped
+
+
+
+
+  adminer:
+    image: adminer
+    restart: unless-stopped
+    ports:
+      - "8081:8080"  # Access at http://localhost:8081      
   app:
     build:
       context: ./app
@@ -16,7 +60,9 @@ services:
       - FLASK_ENV=production
       - PYTHONPATH=/app
     restart: unless-stopped
-
+    depends_on:
+      db:
+        condition: service_healthy
   nginx:
     build:
       context: ./nginx
@@ -26,3 +72,6 @@ services:
     depends_on:
       - app
     restart: unless-stopped
+
+volumes:
+  db_data:
