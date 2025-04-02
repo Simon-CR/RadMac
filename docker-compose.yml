@@ -23,7 +23,6 @@ services:
       timeout: 5s
       retries: 3
 
-services:
   radius:
     build:
       context: ./radius

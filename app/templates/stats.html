@@ -6,7 +6,7 @@
 
 <div class="stats-container">
   <div class="card success-card">
-    <h2>Last Access-Accept Events</h2>
+    <h2>Recent Access-Accept</h2>
     <table class="styled-table small-table">
       <thead>
         <tr>
@@ -19,7 +19,7 @@
       <tbody>
         {% for entry in accept_entries %}
         <tr>
-          <td>{{ entry.username }}</td>
+          <td>{{ entry.mac_address }}</td>
           <td>{{ entry.description or '' }}</td>
           <td>{{ entry.vendor }}</td>
           <td>{{ entry.ago }}</td>
@@ -30,7 +30,7 @@
   </div>
 
   <div class="card error-card">
-    <h2>Last Access-Reject Events</h2>
+    <h2>Recent Access-Reject</h2>
     <table class="styled-table small-table">
       <thead>
         <tr>
@@ -44,20 +44,20 @@
       <tbody>
         {% for entry in reject_entries %}
         <tr>
-          <td>{{ entry.username }}</td>
+          <td>{{ entry.mac_address }}</td>
           <td>{{ entry.description or '' }}</td>
           <td>{{ entry.vendor }}</td>
           <td>{{ entry.ago }}</td>
           <td>
             {% if entry.already_exists %}
-              <span style="color: limegreen;">Already exists in {{ entry.existing_vlan or 'unknown VLAN' }}</span>
+              <span style="color: limegreen;">Already exists in VLAN {{ entry.existing_vlan or 'unknown' }}</span>
             {% else %}
               <form method="POST" action="/user/add_from_reject" style="display: flex; gap: 4px;">
-                <input type="hidden" name="username" value="{{ entry.username }}">
-                <select name="groupname" required>
+                <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
+                <select name="group_id" required>
                   <option value="">Select VLAN</option>
                   {% for group in available_groups %}
-                  <option value="{{ group }}">{{ group }}</option>
+                  <option value="{{ group.id }}">VLAN {{ group.vlan_id }}</option>
                   {% endfor %}
                 </select>
                 <button type="submit" title="Add User">💾</button>

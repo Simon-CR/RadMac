@@ -39,7 +39,7 @@ class MacRadiusServer(Server):
             reply["Tunnel-Medium-Type"] = 6  # IEEE-802
             reply["Tunnel-Private-Group-Id"] = DEFAULT_VLAN_ID
             self.SendReplyPacket(pkt.fd, reply)
-            print(f"[INFO] MAC {mac} not found — assigned to fallback VLAN {DEFAULT_VLAN_ID}")
+            print(f"[INFO] MAC {username} not found — assigned to fallback VLAN {DEFAULT_VLAN_ID}")
 
         self.SendReplyPacket(pkt.fd, reply)
 

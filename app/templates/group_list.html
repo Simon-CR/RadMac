@@ -1,183 +1,52 @@
 {% extends 'base.html' %}
-{% block title %}Group List{% endblock %}
+{% block title %}VLAN Groups{% endblock %}
 
 {% block content %}
-<h1 class="page-title">Group List</h1>
+<h1 class="page-title">VLAN Groups</h1>
 
-<table class="styled-table fade-in">
+<form method="POST" action="{{ url_for('group.add_group_route') }}" style="margin-bottom: 1rem;">
+  <input type="text" name="vlan_id" placeholder="VLAN ID" required pattern="[0-9]+" style="width: 80px;">
+  <input type="text" name="description" placeholder="Group Description">
+  <button type="submit">➕ Add Group</button>
+</form>
+
+<table class="styled-table">
   <thead>
     <tr>
-      <th>Group Name</th>
-      <th>Attribute</th>
-      <th>Op</th>
-      <th>Value</th>
+      <th>VLAN ID</th>
+      <th>Description</th>
+      <th>User Count</th>
       <th>Actions</th>
     </tr>
   </thead>
-  <tbody id="group-body">
-    <!-- New Group Entry Row -->
-    <tr class="new-row">
-      <td rowspan="1"><input type="text" id="new-groupname" placeholder="New group" /></td>
-      <td><input type="text" class="new-attribute" placeholder="Attribute"></td>
-      <td>
-        <select class="new-op">
-          <option value="">Op</option>
-          <option value="=">=</option>
-          <option value="!=">!=</option>
-          <option value=">">&gt;</option>
-          <option value="<">&lt;</option>
-          <option value=">=">&gt;=</option>
-          <option value="<=">&lt;=</option>
-        </select>
-      </td>
-      <td><input type="text" class="new-value" placeholder="Value"></td>
-      <td>
-        <button class="icon-button pulse" onclick="saveNewGroup()" title="Save Group">💾</button>
-        <button class="icon-button" onclick="addAttributeRow()" title="Add Attribute">➕</button>
-      </td>
-    </tr>
-
-    {% for groupname, attributes in grouped_results.items() %}
+  <tbody>
+    {% for group in groups %}
     <tr>
-      <td><input type="text" id="groupname-{{ groupname }}" value="{{ groupname }}" disabled></td>
-      <td colspan="3" class="merged-cell"></td>
+      <td>{{ group.vlan_id }}</td>
       <td>
-        <button class="icon-button" onclick="enableEdit('{{ groupname }}')" title="Edit">✏️</button>
-        <button class="icon-button" onclick="updateGroupName('{{ groupname }}')" title="Save">💾</button>
-        <button class="icon-button" onclick="location.reload()" title="Cancel">❌</button>
-        <a class="icon-button" href="{{ url_for('group.delete_group_rows', groupname=groupname) }}" onclick="saveScrollPosition()" title="Delete Group">🗑️</a>
-        <button class="icon-button" onclick="duplicateToNewGroup('{{ groupname }}')" title="Duplicate">📄</button>
+        <form method="POST" action="{{ url_for('group.update_description_route') }}" class="inline-form">
+          <input type="hidden" name="group_id" value="{{ group.vlan_id }}">
+          <input type="text" name="description" value="{{ group.description or '' }}">
+          <button type="submit" title="Save">💾</button>
+        </form>
+      </td>
+      <td>{{ group.user_count }}</td>
+      <td>
+        <form method="POST" action="{{ url_for('group.delete_group_route') }}" onsubmit="return confirm('Delete this group?');">
+          <input type="hidden" name="group_id" value="{{ group.vlan_id }}">
+          <button type="submit">❌</button>
+        </form>
       </td>
     </tr>
-    {% for attribute in attributes %}
-    <tr>
-      <td class="merged-cell"></td>
-      <td><input type="text" id="attribute-{{ attribute.id }}" value="{{ attribute.attribute }}"></td>
-      <td>
-        <select id="op-{{ attribute.id }}">
-          <option value="=" {% if attribute.op == '=' %}selected{% endif %}>=</option>
-          <option value="!=" {% if attribute.op == '!=' %}selected{% endif %}>!=</option>
-          <option value=">" {% if attribute.op == '>' %}selected{% endif %}>&gt;</option>
-          <option value="<" {% if attribute.op == '<' %}selected{% endif %}>&lt;</option>
-          <option value=">=" {% if attribute.op == '>=' %}selected{% endif %}>&gt;=</option>
-          <option value="<=" {% if attribute.op == '<=' %}selected{% endif %}>&lt;=</option>
-        </select>
-      </td>
-      <td><input type="text" id="value-{{ attribute.id }}" value="{{ attribute.value }}"></td>
-      <td>
-        <button class="icon-button" onclick="updateAttribute('{{ attribute.id }}')" title="Save">💾</button>
-        <button class="icon-button" onclick="location.reload()" title="Reset">❌</button>
-        <a class="icon-button" href="{{ url_for('group.delete_group', group_id=attribute.id) }}" onclick="saveScrollPosition()" title="Delete">🗑️</a>
-      </td>
-    </tr>
-    {% endfor %}
     {% endfor %}
   </tbody>
 </table>
 
-<script>
-function enableEdit(groupname) {
-  const input = document.getElementById(`groupname-${groupname}`);
-  input.disabled = false;
-  input.focus();
+<style>
+form.inline-form {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
 }
-
-function saveScrollPosition() {
-  sessionStorage.setItem("scrollPosition", window.scrollY);
-}
-
-function addAttributeRow() {
-  const table = document.getElementById("group-body");
-  const row = document.createElement("tr");
-  row.classList.add("new-attribute-row");
-  row.innerHTML = `
-    <td class="merged-cell"></td>
-    <td><input type="text" class="new-attribute" placeholder="Attribute"></td>
-    <td>
-      <select class="new-op">
-        <option value="">Op</option>
-        <option value="=">=</option>
-        <option value="!=">!=</option>
-        <option value=">">&gt;</option>
-        <option value="<">&lt;</option>
-        <option value=">=">&gt;=</option>
-        <option value="<=">&lt;=</option>
-      </select>
-    </td>
-    <td><input type="text" class="new-value" placeholder="Value"></td>
-    <td><button class="icon-button" onclick="this.closest('tr').remove()" title="Remove">🗑️</button></td>
-  `;
-  table.insertBefore(row, table.querySelector(".new-row").nextSibling);
-}
-
-function saveNewGroup() {
-  const groupname = document.getElementById("new-groupname").value;
-  const attributes = [];
-  const attrInputs = document.querySelectorAll(".new-attribute");
-
-  attrInputs.forEach((attrInput, index) => {
-    const attribute = attrInput.value;
-    const op = document.querySelectorAll(".new-op")[index].value;
-    const value = document.querySelectorAll(".new-value")[index].value;
-
-    if (attribute && op && value) {
-      attributes.push({ attribute, op, value });
-    }
-  });
-
-  if (!groupname || attributes.length === 0) {
-    showToast("Group name and at least one attribute required.");
-    return;
-  }
-
-  fetch("/group/save_group", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ groupname, attributes })
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      showToast("Group saved.");
-      setTimeout(() => location.reload(), 800);
-    } else {
-      showToast("Error: " + data.error);
-    }
-  });
-}
-
-function duplicateToNewGroup(groupname) {
-  fetch("/group/duplicate_group", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `groupname=${groupname}`
-  })
-  .then(res => res.json())
-  .then(data => {
-    document.getElementById("new-groupname").value = data.new_groupname;
-
-    const oldAttrRows = document.querySelectorAll(".new-attribute-row");
-    oldAttrRows.forEach(row => row.remove());
-
-    data.attributes.forEach(attr => {
-      addAttributeRow();
-      const index = document.querySelectorAll(".new-attribute").length - 1;
-      document.querySelectorAll(".new-attribute")[index].value = attr.attribute;
-      document.querySelectorAll(".new-op")[index].value = attr.op;
-      document.querySelectorAll(".new-value")[index].value = attr.value;
-    });
-
-    document.getElementById("new-groupname").scrollIntoView({ behavior: 'smooth' });
-    showToast("Fields populated from duplicated group.");
-  });
-}
-
-window.onload = function () {
-  const scrollPosition = sessionStorage.getItem("scrollPosition");
-  if (scrollPosition) {
-    window.scrollTo(0, parseInt(scrollPosition) - 100);
-    sessionStorage.removeItem("scrollPosition");
-  }
-};
-</script>
+</style>
 {% endblock %}

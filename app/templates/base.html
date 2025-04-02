@@ -1,245 +1,152 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
-  <meta name="description" content="FreeRADIUS Web Manager">
-  <meta name="author" content="Simon Cloutier">
-  <meta property="og:title" content="FreeRADIUS Manager">
-  <meta property="og:description" content="Manage FreeRADIUS MAC authentication visually">
-  <meta property="og:type" content="website">
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}FreeRADIUS Manager{% endblock %}</title>
-  <style>
-    :root {
-      --bg: #ffffff;
-      --fg: #000000;
-      --cell-bg: #f5f5f5;
-      --th-bg: #e0e0e0;
-    }
+    <meta charset="UTF-8">
+    <title>{% block title %}RadMac{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root {
+            --bg: #121212;
+            --fg: #f0f0f0;
+            --accent: #4caf50;
+            --cell-bg: #1e1e1e;
+            --card-bg: #2c2c2c;
+        }
 
-    [data-theme="dark"] {
-      --bg: #121212;
-      --fg: #e0e0e0;
-      --cell-bg: #1e1e1e;
-      --th-bg: #2c2c2c;
-    }
+        [data-theme="light"] {
+            --bg: #f8f9fa;
+            --fg: #212529;
+            --accent: #28a745;
+            --cell-bg: #ffffff;
+            --card-bg: #e9ecef;
+        }
 
-    body {
-      background-color: var(--bg);
-      color: var(--fg);
-      font-family: sans-serif;
-      margin: 0;
-      padding: 0;
-    }
+        body {
+            background-color: var(--bg);
+            color: var(--fg);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 1rem 2rem;
+        }
 
-    nav {
-      background-color: var(--th-bg);
-      padding: 10px;
-      display: flex;
-      align-items: center;
-    }
+        nav {
+            background-color: var(--card-bg);
+            padding: 1rem;
+            border-bottom: 1px solid #666;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-    nav a {
-      margin-right: 10px;
-      text-decoration: none;
-      padding: 5px 10px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      color: var(--fg);
-    }
+        nav .links a {
+            margin-right: 1rem;
+            color: var(--fg);
+            text-decoration: none;
+            font-weight: bold;
+        }
 
-    nav a.active {
-      background-color: var(--cell-bg);
-    }
+        nav .links a:hover {
+            text-decoration: underline;
+        }
 
-    .content {
-      padding: 20px;
-    }
+        nav .right {
+            display: flex;
+            align-items: center;
+        }
 
-    #theme-toggle {
-      margin-left: auto;
-      cursor: pointer;
-      padding: 5px 10px;
-      border-radius: 5px;
-      border: 1px solid #ccc;
-      background-color: var(--cell-bg);
-      color: var(--fg);
-    }
+        button#theme-toggle {
+            background: none;
+            border: 1px solid var(--fg);
+            padding: 4px 8px;
+            color: var(--fg);
+            cursor: pointer;
+            border-radius: 4px;
+        }
 
-    .styled-table {
-      border-collapse: collapse;
-      width: 100%;
-      margin-bottom: 2rem;
-      background-color: var(--bg);
-      color: var(--fg);
-      transition: all 0.3s ease;
-    }
+        h1, h2, h3 {
+            color: var(--fg);
+        }
 
-    .styled-table th,
-    .styled-table td {
-      border: 1px solid #444;
-      padding: 8px;
-      text-align: left;
-    }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--accent);
+            color: white;
+            padding: 10px 16px;
+            border-radius: 6px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            z-index: 9999;
+        }
 
-    .styled-table input,
-    .styled-table select {
-      background-color: var(--cell-bg);
-      color: var(--fg);
-      border: 1px solid #666;
-      padding: 4px;
-      border-radius: 4px;
-      transition: background-color 0.3s;
-    }
+        .toast.show {
+            opacity: 1;
+        }
 
-    .styled-table input:focus,
-    .styled-table select:focus {
-      background-color: #555;
-      outline: none;
-    }
+        table.styled-table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 1rem;
+            background-color: var(--cell-bg);
+        }
 
-    .styled-table thead {
-      background-color: var(--th-bg);
-      position: sticky;
-      top: 0;
-      z-index: 1;
-    }
+        .styled-table th, .styled-table td {
+            padding: 8px 12px;
+            border: 1px solid #555;
+        }
 
-    .styled-table tbody tr:hover {
-      background-color: rgba(255, 255, 255, 0.05);
-    }
-
-    .icon-button {
-      background-color: var(--cell-bg);
-      color: var(--fg);
-      border: 1px solid #666;
-      border-radius: 4px;
-      padding: 4px 8px;
-      margin: 2px;
-      cursor: pointer;
-      font-size: 1rem;
-      transition: background-color 0.2s, transform 0.2s;
-    }
-
-    .icon-button:hover {
-      background-color: #555;
-      transform: scale(1.05);
-    }
-
-    .icon-button.pulse {
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(50, 205, 50, 0.4); }
-      70% { box-shadow: 0 0 0 10px rgba(50, 205, 50, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(50, 205, 50, 0); }
-    }
-
-    .page-title {
-      margin-bottom: 1rem;
-      color: var(--fg);
-    }
-
-    .merged-cell {
-      border: none;
-    }
-
-    .fade-in {
-      animation: fadeIn 0.5s ease-in;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    #toast-container {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      z-index: 1000;
-    }
-
-    .toast {
-      background-color: #444;
-      color: #fff;
-      padding: 10px 16px;
-      margin-top: 10px;
-      border-radius: 4px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.2);
-      opacity: 0.95;
-      animation: fadein 0.5s, fadeout 0.5s 2.5s;
-    }
-
-    @keyframes fadein {
-      from { opacity: 0; right: 0; }
-      to { opacity: 0.95; }
-    }
-
-    @keyframes fadeout {
-      from { opacity: 0.95; }
-      to { opacity: 0; }
-    }
-  </style>
+        .styled-table th {
+            background-color: var(--card-bg);
+            color: var(--fg);
+        }
+    </style>
 </head>
 <body>
-  <nav>
-    <a href="/" {% if request.path == '/' %}class="active"{% endif %}>Home</a>
-    <a href="/user/user_list" {% if request.path.startswith('/user') %}class="active"{% endif %}>User List</a>
-    <a href="/group/groups" {% if request.path.startswith('/group') %}class="active"{% endif %}>Group List</a>
-    <a href="/stats" {% if request.path.startswith('/stats') %}class="active"{% endif %}>Stats</a>
-    <button id="theme-toggle" onclick="toggleTheme()">🌓</button>
-  </nav>
+    <nav>
+        <div class="links">
+            <a href="/">Home</a>
+            <a href="/user_list">Users</a>
+            <a href="/group">Groups</a>
+            <a href="/stats">Stats</a>
+        </div>
+        <div class="right">
+            <button id="theme-toggle">🌓 Theme</button>
+        </div>
+    </nav>
 
-  <div class="content">
-    {% block content %}{% endblock %}
-  </div>
+    {% block content %}
+    {% endblock %}
 
-  <div id="toast-container"></div>
+    <div id="toast" class="toast"></div>
 
-  <script>
-    function showToast(message) {
-      const toast = document.createElement('div');
-      toast.textContent = message;
-      toast.style.cssText = `
-        position: fixed;
-        bottom: 1rem;
-        left: 50%;
-        transform: translateX(-50%);
-        background: var(--cell-bg, #333);
-        color: var(--fg, #fff);
-        padding: 10px 20px;
-        border-radius: 6px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-        z-index: 9999;
-        font-weight: bold;
-      `;
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 3000);
-    }
-    function toggleTheme() {
-      const current = document.body.dataset.theme || 'light';
-      const next = current === 'light' ? 'dark' : 'light';
-      document.body.dataset.theme = next;
-      localStorage.setItem('theme', next);
-    }
+    <script>
+        // Theme toggle logic
+        const toggleBtn = document.getElementById('theme-toggle');
+        const userPref = localStorage.getItem('theme');
 
-    window.onload = () => {
-      document.body.dataset.theme = localStorage.getItem('theme') || 'light';
-    };
-  </script>
- 
- <script>
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      {% for category, message in messages %}
-        showToast("{{ message }}");
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
-</script>
- 
+        if (userPref) {
+            document.documentElement.setAttribute('data-theme', userPref);
+        }
+
+        toggleBtn.addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme');
+            const next = current === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+        });
+
+        // Toast display function
+        function showToast(message, duration = 3000) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), duration);
+        }
+
+        // Make toast function globally available
+        window.showToast = showToast;
+    </script>
 </body>
 </html>

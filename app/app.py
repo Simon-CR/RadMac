@@ -2,23 +2,15 @@ from flask import Flask, redirect, url_for, render_template
 from views.index_views import index
 from views.user_views import user
 from views.group_views import group
-from config import app_config as config_class
-from database import init_app
+from config import app_config
 
-import logging, os, pytz
+
+import logging, os
 from logging.handlers import RotatingFileHandler
-
-# Instantiate config class
-app_config = config_class()
 
 app = Flask(__name__)
 app.config.from_object(app_config)
-app.config['TZ'] = pytz.timezone(app.config['APP_TIMEZONE'])
-init_app(app)
 
-app.config['TZ'] = pytz.timezone(app.config['APP_TIMEZONE'])
-
-# Logging
 if app.config.get('LOG_TO_FILE'):
     log_file = app.config.get('LOG_FILE_PATH', '/app/logs/app.log')
     os.makedirs(os.path.dirname(log_file), exist_ok=True)
@@ -39,7 +31,8 @@ def legacy_user_list():
 
 @app.route('/groups')
 def legacy_group_list():
-    return redirect(url_for('group.groups'))
+    return redirect(url_for('group.group_list'))
+
 
 @app.route('/')
 def index_redirect():

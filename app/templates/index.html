@@ -1,36 +1,36 @@
 {% extends 'base.html' %}
-{% block title %}FreeRADIUS Manager{% endblock %}
+{% block title %}RadMac{% endblock %}
 
 {% block content %}
-<h1 class="page-title">FreeRADIUS Manager</h1>
+<h1 class="page-title">RadMac</h1>
 
 <div class="stats-cards">
   <div class="card neutral">
-    <strong>Total Users</strong>
+    <strong>Total MAC Addresses</strong>
     <p>{{ total_users }}</p>
   </div>
   <div class="card neutral">
-    <strong>Total Groups</strong>
+    <strong>Total VLAN Groups</strong>
     <p>{{ total_groups }}</p>
   </div>
 </div>
 
-<h2>Recent Access Accepts</h2>
+<h2>Recent Access-Accept</h2>
 <ul class="event-list green">
   {% for entry in latest_accept %}
     <li>
-      <strong>{{ entry.username }}</strong>
+      <strong>{{ entry.mac_address }}</strong>
       {% if entry.description %} ({{ entry.description }}){% endif %}
       — {{ entry.ago }}
     </li>
   {% endfor %}
 </ul>
 
-<h2>Recent Access Rejects</h2>
+<h2>Recent Access-Reject</h2>
 <ul class="event-list red">
   {% for entry in latest_reject %}
     <li>
-      <strong>{{ entry.username }}</strong>
+      <strong>{{ entry.mac_address }}</strong>
       {% if entry.description %} ({{ entry.description }}){% endif %}
       — {{ entry.ago }}
     </li>
@@ -74,7 +74,6 @@ document.getElementById('mac-lookup-form').addEventListener('submit', function(e
   margin-bottom: 1rem;
   color: var(--fg);
 }
-
 .stats-cards {
   display: flex;
   gap: 1rem;
@@ -101,7 +100,6 @@ document.getElementById('mac-lookup-form').addEventListener('submit', function(e
 }
 .event-list.green li { color: #4caf50; }
 .event-list.red li { color: #ff4d4d; }
-
 #mac-lookup-form input {
   padding: 6px;
   border-radius: 4px;

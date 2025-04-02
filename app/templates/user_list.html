@@ -1,61 +1,62 @@
 {% extends 'base.html' %}
-{% block title %}User List{% endblock %}
+{% block title %}MAC Address List{% endblock %}
 
 {% block content %}
-<h1 class="page-title">User List</h1>
+<h1 class="page-title">MAC Address List</h1>
 
-<table class="styled-table fade-in">
+<form id="add-user-form" method="POST" action="{{ url_for('user.add') }}">
+  <input type="text" name="mac_address" placeholder="MAC address (12 hex characters)" required maxlength="12">
+  <input type="text" name="description" placeholder="Description (optional)">
+  <select name="group_id" required>
+    <option value="">Assign to VLAN</option>
+    {% for group in groups %}
+    <option value="{{ group.id }}">VLAN {{ group.vlan_id }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">➕ Add</button>
+</form>
+
+<table class="styled-table">
   <thead>
     <tr>
       <th>MAC Address</th>
-      <th>
-        Vendor
-        <button class="icon-button" onclick="refreshVendors(this)" title="Refresh Vendor">🔄</button>
-      </th>
       <th>Description</th>
-      <th>Group</th>
+      <th>Vendor <button id="refresh-vendors" title="Refresh unknown vendors">🔄</button></th>
+      <th>VLAN</th>
       <th>Actions</th>
     </tr>
   </thead>
-  <tbody id="user-body">
-    <!-- New User Row -->
-    <tr class="new-row">
-      <td><input type="text" id="new-mac" placeholder="MAC address"></td>
-      <td><em>(auto)</em></td>
-      <td><input type="text" id="new-description" placeholder="Description"></td>
-      <td>
-        <select id="new-vlan">
-          <option value="">-- Select Group --</option>
-          {% for group in groups %}
-            <option value="{{ group.groupname }}">{{ group.groupname }}</option>
-          {% endfor %}
-        </select>
-      </td>
-      <td>
-        <button class="icon-button pulse" onclick="addUser()" title="Save User">💾</button>
-        <button class="icon-button" onclick="clearUserFields()" title="Reset">❌</button>
-      </td>
-    </tr>
-
-    {% for row in results %}
+  <tbody>
+    {% for entry in users %}
     <tr>
-      <td><input type="text" value="{{ row.mac_address }}" id="mac-{{ loop.index }}" disabled></td>
-      <td>{{ row.vendor or 'Unknown Vendor' }}</td>
-      <td><input type="text" value="{{ row.description }}" id="desc-{{ loop.index }}"></td>
+      <td>{{ entry.mac_address }}</td>
       <td>
-        <select id="vlan-{{ loop.index }}">
-          {% for group in groups %}
-            <option value="{{ group.groupname }}" {% if group.groupname == row.vlan_id %}selected{% endif %}>
-              {{ group.groupname }}
-            </option>
-          {% endfor %}
-        </select>
+        <form method="POST" action="{{ url_for('user.update_description_route') }}" class="inline-form">
+          <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
+          <input type="text" name="description" value="{{ entry.description or '' }}">
+          <button type="submit" title="Save">💾</button>
+        </form>
+      </td>
+      <td>{% if entry.vendor_name %}
+        {{ entry.vendor_name }}
+      {% else %}
+        <em>Unknown</em>
+      {% endif %}</td>
+      <td>
+        <form method="POST" action="{{ url_for('user.update_vlan_route') }}" class="inline-form">
+          <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
+          <select name="group_id" onchange="this.form.submit()">
+            {% for group in groups %}
+            <option value="{{ group.id }}" {% if group.vlan_id == entry.vlan_id %}selected{% endif %}>VLAN {{ group.vlan_id }}</option>
+            {% endfor %}
+          </select>
+        </form>
       </td>
       <td>
-        <button class="icon-button" onclick="enableUserEdit({{ loop.index }})" title="Edit">✏️</button>
-        <button class="icon-button" onclick="updateUser({{ loop.index }}, '{{ row.mac_address }}')" title="Save">💾</button>
-        <button class="icon-button" onclick="location.reload()" title="Cancel">❌</button>
-        <a class="icon-button" href="/user/delete_user/{{ row.mac_address }}" onclick="saveScrollPosition()" title="Delete">🗑️</a>
+        <form method="POST" action="{{ url_for('user.delete') }}">
+          <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
+          <button type="submit" onclick="return confirm('Delete this MAC address?')">❌</button>
+        </form>
       </td>
     </tr>
     {% endfor %}
@@ -63,117 +64,22 @@
 </table>
 
 <script>
-function enableUserEdit(index) {
-  const input = document.getElementById(`mac-${index}`);
-  input.disabled = false;
-  input.focus();
-}
-
-function clearUserFields() {
-  document.getElementById("new-mac").value = "";
-  document.getElementById("new-description").value = "";
-  document.getElementById("new-vlan").selectedIndex = 0;
-}
-
-function addUser() {
-  const mac = document.getElementById("new-mac").value;
-  const desc = document.getElementById("new-description").value;
-  const vlan = document.getElementById("new-vlan").value;
-
-  if (!mac || !vlan) {
-    showToast("MAC address and group are required.");
-    return;
-  }
-
-  fetch("/user/add_user", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mac_address: mac, description: desc, vlan_id: vlan })
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      showToast("User added.");
-      setTimeout(() => location.reload(), 800);
-    } else {
-      showToast("Error: " + data.message);
-    }
-  });
-}
-
-function updateUser(index, originalMac) {
-  const macInput = document.getElementById(`mac-${index}`);
-  const desc = document.getElementById(`desc-${index}`).value;
-  const vlan = document.getElementById(`vlan-${index}`).value;
-
-  fetch("/user/update_user", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `mac_address=${originalMac}&new_mac_address=${macInput.value}&description=${desc}&vlan_id=${vlan}`
-  })
-  .then(res => res.text())
-  .then(data => {
-    if (data === "success") {
-      showToast("User updated.");
-      setTimeout(() => location.reload(), 800);
-    } else {
-      showToast("Update failed: " + data);
-    }
-  });
-}
-
-// function refreshVendors() {
-//   showToast("Refreshing vendor info...");
-//   fetch("/user/refresh_vendors", {
-//     method: "POST"
-//   })
-//   .then(res => res.json())
-//   .then(data => {
-//     showToast(data.message || "Refreshed.");
-//     setTimeout(() => location.reload(), 1200);
-//   })
-//   .catch(() => showToast("Failed to refresh vendor info."));
-// }
-
-function refreshVendors(btn) {
-  btn.disabled = true;
-  showToast("Refreshing vendor info...");
-
-  function refreshCycle() {
-    fetch("/user/refresh_vendors", { method: "POST" })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          showToast(`Updated ${data.updated} vendors`);
-          if (data.remaining) {
-            setTimeout(refreshCycle, 1500);  // Pause before next batch
-          } else {
-            showToast("Vendor refresh complete.");
-            setTimeout(() => location.reload(), 1000);
-          }
-        } else {
-          showToast("Refresh failed: " + data.message);
-        }
-      })
-      .catch(err => {
-        console.error(err);
-        showToast("Error during vendor refresh.");
-      });
-  }
-
-  refreshCycle();
-}
-
-function saveScrollPosition() {
-  sessionStorage.setItem("scrollPosition", window.scrollY);
-}
-
-window.onload = function () {
-  const scroll = sessionStorage.getItem("scrollPosition");
-  if (scroll) {
-    window.scrollTo(0, parseInt(scroll) - 100);
-    sessionStorage.removeItem("scrollPosition");
-  }
-};
+document.getElementById('refresh-vendors').addEventListener('click', function () {
+  fetch("{{ url_for('user.refresh') }}", { method: "POST" })
+    .then(res => res.json())
+    .then(data => {
+      alert("Vendor refresh complete.");
+      window.location.reload();
+    })
+    .catch(err => alert("Error: " + err));
+});
 </script>
+
+<style>
+form.inline-form {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+</style>
 {% endblock %}
