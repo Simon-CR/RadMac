@@ -1,0 +1,238 @@
+:root {
+  --bg: #121212;
+  --fg: #f0f0f0;
+  --accent: #ffdd57; /* Soft yellow */
+  --error: crimson;
+  --cell-bg: #1e1e1e;
+  --card-bg: #2c2c2c;
+  --header-bg: #2a2a2a;
+}
+
+[data-theme="light"] {
+  --bg: #f8f9fa;
+  --fg: #212529;
+  --accent: #4a90e2; /* Softer blue */
+  --error: red;
+  --cell-bg: #ffffff;
+  --card-bg: #e9ecef;
+  --header-bg: #dee2e6;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 1rem 2rem;
+}
+
+nav {
+  background-color: var(--card-bg);
+  padding: 1rem;
+  border-bottom: 1px solid #666;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+nav .links a {
+  margin-right: 1rem;
+  color: var(--fg);
+  text-decoration: none;
+  font-weight: bold;
+}
+
+nav .links a:hover {
+  text-decoration: underline;
+}
+
+button#theme-toggle {
+  background: none;
+  border: 1px solid var(--fg);
+  padding: 4px 8px;
+  color: var(--fg);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+h1, h2, h3 {
+  color: var(--fg);
+}
+
+.toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: var(--accent);
+  color: black;
+  padding: 10px 16px;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  z-index: 9999;
+}
+
+.toast.show {
+  opacity: 1;
+}
+
+#scrollTopBtn {
+  display: none;
+  position: fixed;
+  bottom: 30px;
+  left: 30px;
+  z-index: 1000;
+  font-size: 1.2rem;
+  background-color: var(--accent);
+  border: none;
+  border-radius: 50%;
+  padding: 10px 14px;
+  cursor: pointer;
+  color: black;
+}
+
+table.styled-table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 1rem;
+  background-color: var(--cell-bg);
+}
+
+.styled-table thead {
+  position: sticky;
+  top: 0;
+  background-color: var(--header-bg);
+  z-index: 5;
+}
+
+.styled-table th,
+.styled-table td {
+  padding: 10px 14px;
+  border: 1px solid #999;
+}
+
+.styled-table th {
+  background-color: var(--header-bg);
+  color: var(--fg);
+  text-align: left;
+}
+
+.styled-table input[type="text"],
+.styled-table select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px;
+  color: var(--fg);
+  background-color: var(--cell-bg);
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.styled-table input[type="text"]:focus,
+.styled-table select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+form.inline-form {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.styled-table button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 1rem;
+  color: inherit;
+}
+
+[data-theme="light"] .styled-table button {
+  background: transparent;
+}
+
+.styled-table button[title="Save"] {
+  color: var(--accent);
+}
+
+#refresh-vendors {
+  background: none;
+  color: var(--accent);
+  border: none;
+  padding: 0;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.styled-table button[onclick*="Delete"] {
+  color: var(--error);
+  background: none;
+}
+
+.styled-table td form {
+  margin: 0;
+}
+
+.stats-cards {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.card {
+  background: var(--cell-bg);
+  border: 1px solid #666;
+  padding: 1rem;
+  border-radius: 8px;
+  flex: 1;
+  text-align: center;
+}
+
+.card.neutral {
+  background-color: var(--card-bg);
+}
+
+.event-list {
+  list-style: none;
+  padding: 0;
+}
+
+.event-list li {
+  padding: 4px 0;
+  border-bottom: 1px dashed #666;
+}
+
+.event-list.green li { color: #4caf50; }
+.event-list.red li { color: #ff4d4d; }
+
+#mac-lookup-form input {
+  padding: 6px;
+  border-radius: 4px;
+  border: 1px solid #999;
+  width: 250px;
+  color: var(--fg);
+  background-color: var(--cell-bg);
+}
+
+#mac-lookup-form button {
+  padding: 6px 12px;
+  margin-left: 10px;
+  cursor: pointer;
+  border: none;
+  border-radius: 4px;
+  background-color: var(--accent);
+  color: black;
+}
+
+.debug-output {
+  background-color: #222;
+  color: #b6fcd5;
+  border: 1px solid #333;
+  padding: 1em;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  margin-top: 1em;
+}

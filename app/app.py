@@ -33,6 +33,9 @@ def legacy_user_list():
 def legacy_group_list():
     return redirect(url_for('group.group_list'))
 
+@app.route('/stats')
+def stats():
+    return render_template('stats.html')
 
 @app.route('/')
 def index_redirect():

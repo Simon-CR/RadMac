@@ -1,152 +1,69 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>{% block title %}RadMac{% endblock %}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        :root {
-            --bg: #121212;
-            --fg: #f0f0f0;
-            --accent: #4caf50;
-            --cell-bg: #1e1e1e;
-            --card-bg: #2c2c2c;
-        }
-
-        [data-theme="light"] {
-            --bg: #f8f9fa;
-            --fg: #212529;
-            --accent: #28a745;
-            --cell-bg: #ffffff;
-            --card-bg: #e9ecef;
-        }
-
-        body {
-            background-color: var(--bg);
-            color: var(--fg);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 1rem 2rem;
-        }
-
-        nav {
-            background-color: var(--card-bg);
-            padding: 1rem;
-            border-bottom: 1px solid #666;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        nav .links a {
-            margin-right: 1rem;
-            color: var(--fg);
-            text-decoration: none;
-            font-weight: bold;
-        }
-
-        nav .links a:hover {
-            text-decoration: underline;
-        }
-
-        nav .right {
-            display: flex;
-            align-items: center;
-        }
-
-        button#theme-toggle {
-            background: none;
-            border: 1px solid var(--fg);
-            padding: 4px 8px;
-            color: var(--fg);
-            cursor: pointer;
-            border-radius: 4px;
-        }
-
-        h1, h2, h3 {
-            color: var(--fg);
-        }
-
-        .toast {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background-color: var(--accent);
-            color: white;
-            padding: 10px 16px;
-            border-radius: 6px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
-            opacity: 0;
-            transition: opacity 0.5s ease;
-            z-index: 9999;
-        }
-
-        .toast.show {
-            opacity: 1;
-        }
-
-        table.styled-table {
-            border-collapse: collapse;
-            width: 100%;
-            margin-top: 1rem;
-            background-color: var(--cell-bg);
-        }
-
-        .styled-table th, .styled-table td {
-            padding: 8px 12px;
-            border: 1px solid #555;
-        }
-
-        .styled-table th {
-            background-color: var(--card-bg);
-            color: var(--fg);
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <title>{% block title %}RadMac{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <nav>
-        <div class="links">
-            <a href="/">Home</a>
-            <a href="/user_list">Users</a>
-            <a href="/group">Groups</a>
-            <a href="/stats">Stats</a>
-        </div>
-        <div class="right">
-            <button id="theme-toggle">🌓 Theme</button>
-        </div>
-    </nav>
+  <nav>
+    <div class="links">
+      <a href="{{ url_for('index_redirect') }}">Home</a>
+      <a href="{{ url_for('user.user_list') }}">Users</a>
+      <a href="{{ url_for('group.group_list') }}">Groups</a>
+      <a href="{{ url_for('stats') }}">Stats</a>
+    </div>
+    <div class="right">
+      <button id="theme-toggle">🌓 Theme</button>
+    </div>
+  </nav>
 
-    {% block content %}
-    {% endblock %}
+  {% block content %}{% endblock %}
 
-    <div id="toast" class="toast"></div>
+  <div id="toast" class="toast"></div>
+  <button id="scrollTopBtn" title="Back to top">⬆</button>
 
-    <script>
-        // Theme toggle logic
-        const toggleBtn = document.getElementById('theme-toggle');
-        const userPref = localStorage.getItem('theme');
+  <script>
+    // Theme toggle
+    const toggleBtn = document.getElementById('theme-toggle');
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
 
-        if (userPref) {
-            document.documentElement.setAttribute('data-theme', userPref);
-        }
+    toggleBtn.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = current === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+    });
 
-        toggleBtn.addEventListener('click', () => {
-            const current = document.documentElement.getAttribute('data-theme');
-            const next = current === 'light' ? 'dark' : 'light';
-            document.documentElement.setAttribute('data-theme', next);
-            localStorage.setItem('theme', next);
-        });
+    // Toast function
+    window.showToast = function (msg, duration = 3000) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), duration);
+    };
 
-        // Toast display function
-        function showToast(message, duration = 3000) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), duration);
-        }
+    // Scroll-to-top button
+    const scrollBtn = document.getElementById('scrollTopBtn');
+    window.onscroll = () => {
+      scrollBtn.style.display = window.scrollY > 150 ? 'block' : 'none';
+    };
+    scrollBtn.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
-        // Make toast function globally available
-        window.showToast = showToast;
-    </script>
+    // Preserve scroll position
+    window.addEventListener('beforeunload', () => {
+      sessionStorage.setItem('scrollTop', window.scrollY);
+    });
+
+    window.addEventListener('load', () => {
+      const scrollTop = sessionStorage.getItem('scrollTop');
+      if (scrollTop !== null) {
+        window.scrollTo(0, parseInt(scrollTop));
+        sessionStorage.removeItem('scrollTop');
+      }
+    });
+  </script>
 </body>
 </html>

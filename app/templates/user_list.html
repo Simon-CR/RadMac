@@ -5,12 +5,12 @@
 <h1 class="page-title">MAC Address List</h1>
 
 <form id="add-user-form" method="POST" action="{{ url_for('user.add') }}">
-  <input type="text" name="mac_address" placeholder="MAC address (12 hex characters)" required maxlength="12">
+  <input type="text" name="mac_address" placeholder="MAC address (12 hex)" required maxlength="12">
   <input type="text" name="description" placeholder="Description (optional)">
   <select name="group_id" required>
     <option value="">Assign to VLAN</option>
     {% for group in groups %}
-    <option value="{{ group.id }}">VLAN {{ group.vlan_id }}</option>
+    <option value="{{ group.vlan_id }}">VLAN {{ group.vlan_id }}</option>
     {% endfor %}
   </select>
   <button type="submit">➕ Add</button>
@@ -30,30 +30,37 @@
     {% for entry in users %}
     <tr>
       <td>{{ entry.mac_address }}</td>
+
       <td>
-        <form method="POST" action="{{ url_for('user.update_description_route') }}" class="inline-form">
+        <form method="POST" action="{{ url_for('user.update_description_route') }}">
           <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
           <input type="text" name="description" value="{{ entry.description or '' }}">
-          <button type="submit" title="Save">💾</button>
         </form>
       </td>
-      <td>{% if entry.vendor_name %}
-        {{ entry.vendor_name }}
-      {% else %}
-        <em>Unknown</em>
-      {% endif %}</td>
+
+      <td>{{ entry.vendor or "..." }}</td>
+
       <td>
         <form method="POST" action="{{ url_for('user.update_vlan_route') }}" class="inline-form">
           <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
           <select name="group_id" onchange="this.form.submit()">
             {% for group in groups %}
-            <option value="{{ group.id }}" {% if group.vlan_id == entry.vlan_id %}selected{% endif %}>VLAN {{ group.vlan_id }}</option>
+            <option value="{{ group.vlan_id }}" {% if group.vlan_id == entry.vlan_id %}selected{% endif %}>
+              VLAN {{ group.vlan_id }}
+            </option>
             {% endfor %}
           </select>
         </form>
       </td>
+
       <td>
-        <form method="POST" action="{{ url_for('user.delete') }}">
+        <form method="POST" action="{{ url_for('user.update_description_route') }}" style="display:inline;">
+          <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
+          <input type="hidden" name="description" value="{{ entry.description }}">
+          <button type="submit" title="Save">💾</button>
+        </form>
+
+        <form method="POST" action="{{ url_for('user.delete') }}" style="display:inline;">
           <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
           <button type="submit" onclick="return confirm('Delete this MAC address?')">❌</button>
         </form>
@@ -64,22 +71,14 @@
 </table>
 
 <script>
-document.getElementById('refresh-vendors').addEventListener('click', function () {
-  fetch("{{ url_for('user.refresh') }}", { method: "POST" })
-    .then(res => res.json())
-    .then(data => {
-      alert("Vendor refresh complete.");
-      window.location.reload();
-    })
-    .catch(err => alert("Error: " + err));
-});
+  document.getElementById('refresh-vendors').addEventListener('click', function () {
+    fetch("{{ url_for('user.refresh') }}", { method: "POST" })
+      .then(res => res.json())
+      .then(data => {
+        window.showToast("Vendor refresh complete.");
+        window.location.reload();
+      })
+      .catch(err => alert("Error: " + err));
+  });
 </script>
-
-<style>
-form.inline-form {
-  display: inline-flex;
-  gap: 4px;
-  align-items: center;
-}
-</style>
 {% endblock %}

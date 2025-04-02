@@ -5,3 +5,4 @@ BeautifulSoup4
 lxml
 gunicorn
 pytz
+humanize

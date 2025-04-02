@@ -11,8 +11,9 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS auth_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     mac_address CHAR(12) NOT NULL CHECK (mac_address REGEXP '^[0-9A-Fa-f]{12}$'),
-    reply ENUM('Access-Accept', 'Access-Reject') NOT NULL,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    reply ENUM('Access-Accept', 'Access-Reject', 'Accept-Fallback') NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    result VARCHAR(500) DEFAULT NULL,
 );
 
 -- Table for MAC vendor caching

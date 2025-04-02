@@ -24,15 +24,19 @@
     <tr>
       <td>{{ group.vlan_id }}</td>
       <td>
-        <form method="POST" action="{{ url_for('group.update_description_route') }}" class="inline-form">
+        <form method="POST" action="{{ url_for('group.update_description_route') }}" class="preserve-scroll">
           <input type="hidden" name="group_id" value="{{ group.vlan_id }}">
-          <input type="text" name="description" value="{{ group.description or '' }}">
-          <button type="submit" title="Save">💾</button>
+          <input type="text" name="description" value="{{ group.description or '' }}" class="description-input">
         </form>
       </td>
       <td>{{ group.user_count }}</td>
       <td>
-        <form method="POST" action="{{ url_for('group.delete_group_route') }}" onsubmit="return confirm('Delete this group?');">
+        <form method="POST" action="{{ url_for('group.update_description_route') }}" class="preserve-scroll" style="display:inline;">
+          <input type="hidden" name="group_id" value="{{ group.vlan_id }}">
+          <input type="hidden" name="description" value="{{ group.description }}">
+          <button type="submit" title="Save">💾</button>
+        </form>
+        <form method="POST" action="{{ url_for('group.delete_group_route') }}" class="preserve-scroll" style="display:inline;" onsubmit="return confirm('Delete this group?');">
           <input type="hidden" name="group_id" value="{{ group.vlan_id }}">
           <button type="submit">❌</button>
         </form>
@@ -42,11 +46,18 @@
   </tbody>
 </table>
 
-<style>
-form.inline-form {
-  display: inline-flex;
-  gap: 4px;
-  align-items: center;
-}
-</style>
+<script>
+  document.querySelectorAll('form.preserve-scroll').forEach(form => {
+    form.addEventListener('submit', () => {
+      localStorage.setItem('scrollY', window.scrollY);
+    });
+  });
+  window.addEventListener('load', () => {
+    const scrollY = localStorage.getItem('scrollY');
+    if (scrollY) {
+      window.scrollTo(0, parseInt(scrollY));
+      localStorage.removeItem('scrollY');
+    }
+  });
+</script>
 {% endblock %}

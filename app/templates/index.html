@@ -45,79 +45,29 @@
   <button type="submit">🔍 Lookup</button>
 </form>
 
-<pre id="mac-result" class="debug-output" style="margin-top: 1em;"></pre>
+<pre id="mac-result" class="debug-output"></pre>
 
 <script>
-document.getElementById('mac-lookup-form').addEventListener('submit', function(e) {
-  e.preventDefault();
-  const form = e.target;
-  const data = new URLSearchParams(new FormData(form));
-  const resultBox = document.getElementById('mac-result');
-  resultBox.textContent = "Querying...";
+    document.getElementById('mac-lookup-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const form = e.target;
+      const data = new URLSearchParams(new FormData(form));
+      const resultBox = document.getElementById('mac-result');
+      resultBox.textContent = "Querying...";
 
-  fetch(form.action, {
-    method: 'POST',
-    body: data,
-  })
-  .then(r => r.json())
-  .then(data => {
-    resultBox.textContent = JSON.stringify(data, null, 2);
-  })
-  .catch(err => {
-    resultBox.textContent = `Error: ${err}`;
-  });
-});
+      fetch(form.action, {
+        method: 'POST',
+        body: data,
+      })
+      .then(r => r.json())
+      .then(data => {
+        // Update: Use 'output' from the API response
+        resultBox.textContent = data.output || "No data returned.";
+      })
+      .catch(err => {
+        resultBox.textContent = `Error: ${err}`;
+      });
+    });
 </script>
 
-<style>
-.page-title {
-  margin-bottom: 1rem;
-  color: var(--fg);
-}
-.stats-cards {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-.card {
-  background: var(--cell-bg);
-  border: 1px solid #666;
-  padding: 1rem;
-  border-radius: 8px;
-  flex: 1;
-  text-align: center;
-}
-.card.neutral {
-  background-color: #444;
-}
-.event-list {
-  list-style: none;
-  padding: 0;
-}
-.event-list li {
-  padding: 4px 0;
-  border-bottom: 1px dashed #666;
-}
-.event-list.green li { color: #4caf50; }
-.event-list.red li { color: #ff4d4d; }
-#mac-lookup-form input {
-  padding: 6px;
-  border-radius: 4px;
-  border: 1px solid #999;
-  width: 250px;
-}
-#mac-lookup-form button {
-  padding: 6px 12px;
-  margin-left: 10px;
-  cursor: pointer;
-}
-.debug-output {
-  background-color: #222;
-  color: #b6fcd5;
-  border: 1px solid #333;
-  padding: 1em;
-  font-size: 0.9rem;
-  white-space: pre-wrap;
-}
-</style>
 {% endblock %}

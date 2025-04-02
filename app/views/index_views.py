@@ -5,11 +5,11 @@ from db_interface import (
     get_vendor_info,
     get_all_groups,
     get_latest_auth_logs,
+    lookup_mac_verbose
 )
 import pytz
 
 index = Blueprint('index', __name__)
-
 
 def time_ago(dt):
     if not dt:
@@ -36,7 +36,6 @@ def time_ago(dt):
     else:
         return f"{seconds // 86400}d{(seconds % 86400) // 3600}h ago"
 
-
 @index.route('/')
 def homepage():
     total_users, total_groups = get_summary_counts()
@@ -52,24 +51,30 @@ def homepage():
                            latest_accept=latest_accept,
                            latest_reject=latest_reject)
 
-
 @index.route('/stats')
 def stats():
-    accept_entries = get_latest_auth_logs('Access-Accept', limit=25)
-    reject_entries = get_latest_auth_logs('Access-Reject', limit=25)
+    accept_entries = get_latest_auth_logs('Access-Accept')
+    reject_entries = get_latest_auth_logs('Access-Reject')
     available_groups = get_all_groups()
+    
+    # Process entries to add vendor and time-ago
+    from datetime import datetime, timezone
+    import humanize
 
-    for entry in accept_entries + reject_entries:
-        entry['ago'] = time_ago(entry['timestamp'])
+    def enrich(entry):
+        from db_interface import get_vendor_info, get_user_by_mac
         entry['vendor'] = get_vendor_info(entry['mac_address'])
-        entry['already_exists'] = entry.get('vlan_id') is not None
-        entry['existing_vlan'] = entry.get('vlan_id') if entry['already_exists'] else None
+        entry['ago'] = humanize.naturaltime(datetime.now(timezone.utc) - entry['timestamp'])
+        user = get_user_by_mac(entry['mac_address'])
+        entry['already_exists'] = user is not None
+        entry['existing_vlan'] = user['vlan_id'] if user else None
+        entry['description'] = user['description'] if user else None
+        return entry
 
-    return render_template('stats.html',
-                           accept_entries=accept_entries,
-                           reject_entries=reject_entries,
-                           available_groups=available_groups)
+    accept_entries = [enrich(e) for e in accept_entries]
+    reject_entries = [enrich(e) for e in reject_entries]
 
+    return render_template("stats.html", accept_entries=accept_entries, reject_entries=reject_entries, available_groups=available_groups)
 
 @index.route('/lookup_mac', methods=['POST'])
 def lookup_mac():
@@ -77,7 +82,8 @@ def lookup_mac():
     if not mac:
         return jsonify({"error": "MAC address is required"}), 400
 
-    return jsonify(get_vendor_info(mac))
+    result = lookup_mac_verbose(mac)
+    return jsonify({"mac": mac, "output": result})
 
 
 def get_summary_counts():
