@@ -115,7 +115,12 @@ table.styled-table {
 .styled-table th {
   background-color: var(--header-bg);
   color: var(--fg);
-  text-align: left;
+  text-align: center;
+}
+
+/* 🧩 Fix: Remove right border from last column */
+.styled-table thead th:last-child {
+  border-right: none;
 }
 
 .styled-table input[type="text"],
@@ -235,4 +240,57 @@ form.inline-form {
   font-size: 0.9rem;
   white-space: pre-wrap;
   margin-top: 1em;
+}
+
+.stats-page .stats-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+}
+
+.stats-page .card {
+  flex: 1;
+  min-width: 45%;
+  padding: 1rem;
+  border-radius: 8px;
+  background-color: var(--card-bg);
+  color: var(--fg);
+  box-shadow: 0 0 10px rgba(0,0,0,0.2);
+}
+
+.stats-page .success-card {
+  border-left: 6px solid limegreen;
+}
+
+.stats-page .error-card {
+  border-left: 6px solid crimson;
+}
+
+.stats-page .fallback-card {
+  border-left: 6px solid orange;
+}
+
+.stats-page .styled-table.small-table td,
+.stats-page .styled-table.small-table th {
+  padding: 6px;
+  font-size: 0.9rem;
+}
+
+.stats-page form.inline-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.stats-page form.inline-form select {
+  flex: 1;
+  min-width: 140px;
+  max-width: 100%;
+}
+
+.stats-page form.inline-form button {
+  flex: 0 0 auto;
+  padding: 6px;
 }

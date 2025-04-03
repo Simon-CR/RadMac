@@ -6,8 +6,8 @@ group = Blueprint('group', __name__, url_prefix='/group')
 
 @group.route('/')
 def group_list():
-    groups = get_all_groups()
-    return render_template('group_list.html', groups=groups)
+    available_groups = get_all_groups()
+    return render_template('group_list.html', available_groups=available_groups)
 
 
 @group.route('/add', methods=['POST'])

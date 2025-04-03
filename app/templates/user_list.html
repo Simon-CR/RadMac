@@ -9,7 +9,7 @@
   <input type="text" name="description" placeholder="Description (optional)">
   <select name="group_id" required>
     <option value="">Assign to VLAN</option>
-    {% for group in groups %}
+    {% for group in available_groups %}
     <option value="{{ group.vlan_id }}">VLAN {{ group.vlan_id }}</option>
     {% endfor %}
   </select>
@@ -44,7 +44,7 @@
         <form method="POST" action="{{ url_for('user.update_vlan_route') }}" class="inline-form">
           <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
           <select name="group_id" onchange="this.form.submit()">
-            {% for group in groups %}
+            {% for group in available_groups %}
             <option value="{{ group.vlan_id }}" {% if group.vlan_id == entry.vlan_id %}selected{% endif %}>
               VLAN {{ group.vlan_id }}
             </option>

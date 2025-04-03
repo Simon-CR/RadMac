@@ -2,6 +2,7 @@ from flask import Flask, redirect, url_for, render_template
 from views.index_views import index
 from views.user_views import user
 from views.group_views import group
+from views.stats_views import stats
 from config import app_config
 
 
@@ -24,6 +25,7 @@ app.logger.setLevel(logging.INFO)
 app.register_blueprint(index)
 app.register_blueprint(user, url_prefix='/user')
 app.register_blueprint(group, url_prefix='/group')
+app.register_blueprint(stats, url_prefix='/stats')
 
 @app.route('/user_list')
 def legacy_user_list():
@@ -32,10 +34,6 @@ def legacy_user_list():
 @app.route('/groups')
 def legacy_group_list():
     return redirect(url_for('group.group_list'))
-
-@app.route('/stats')
-def stats():
-    return render_template('stats.html')
 
 @app.route('/')
 def index_redirect():

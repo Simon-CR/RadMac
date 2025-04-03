@@ -15,29 +15,26 @@
   </div>
 </div>
 
-<h2>Recent Access-Accept</h2>
-<ul class="event-list green">
-  {% for entry in latest_accept %}
+<h2>Recent Access Logs</h2>
+<ul class="event-list">
+  <li><strong>Access-Accept Logs</strong></li>
+  {% for log in latest_accept %}
     <li>
-      <strong>{{ entry.mac_address }}</strong>
-      {% if entry.description %} ({{ entry.description }}){% endif %}
-      — {{ entry.ago }}
+      <strong>{{ log.mac_address }}</strong> - {{ log.reply }}
+      <br>
+      <small>{{ log.timestamp }} - {{ log.result }}</small>
+    </li>
+  {% endfor %}
+  
+  <li><strong>Access-Reject Logs</strong></li>
+  {% for log in latest_reject %}
+    <li>
+      <strong>{{ log.mac_address }}</strong> - {{ log.reply }}
+      <br>
+      <small>{{ log.timestamp }} - {{ log.result }}</small>
     </li>
   {% endfor %}
 </ul>
-
-<h2>Recent Access-Reject</h2>
-<ul class="event-list red">
-  {% for entry in latest_reject %}
-    <li>
-      <strong>{{ entry.mac_address }}</strong>
-      {% if entry.description %} ({{ entry.description }}){% endif %}
-      — {{ entry.ago }}
-    </li>
-  {% endfor %}
-</ul>
-
-<hr>
 
 <h2>MAC Vendor Lookup</h2>
 <form id="mac-lookup-form" method="POST" action="/lookup_mac">

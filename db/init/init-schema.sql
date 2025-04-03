@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS users (
     mac_address CHAR(12) NOT NULL PRIMARY KEY CHECK (mac_address REGEXP '^[0-9A-Fa-f]{12}$'),
     description VARCHAR(200),
-    vlan_id VARCHAR(64)
+    vlan_id VARCHAR(64) NOT NULL
 );
 
 -- Table for auth logs

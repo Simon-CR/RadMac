@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, request, redirect, url_for
-from db_interface import get_all_users, get_all_groups, add_user, update_description, update_vlan, delete_user, refresh_vendors
+from flask import Blueprint, render_template, request, redirect, url_for, flash
+from db_interface import get_all_users, get_all_groups, add_user, update_description, update_vlan, delete_user, refresh_vendors, get_user_by_mac
 
 user = Blueprint('user', __name__, url_prefix='/user')
 

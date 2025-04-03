@@ -2,99 +2,132 @@
 {% block title %}Authentication Stats{% endblock %}
 
 {% block content %}
+<div class="stats-page">
+
 <h1 class="page-title">Authentication Stats</h1>
 
-<div class="stats-container">
-  <div class="card success-card">
-    <h2>Recent Access-Accept</h2>
-    <table class="styled-table small-table">
-      <thead>
-        <tr>
-          <th>MAC Address</th>
-          <th>Description</th>
-          <th>Vendor</th>
-          <th>Time</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for entry in accept_entries %}
-        <tr>
-          <td>{{ entry.mac_address }}</td>
-          <td>{{ entry.description or '' }}</td>
-          <td>{{ entry.vendor }}</td>
-          <td>{{ entry.ago }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+<form method="POST" action="/stats/stats">
+    <label for="time_range">Select Time Range:</label>
+    <select name="time_range" id="time_range">
+        <option value="last_minute" {% if time_range == 'last_minute' %}selected{% endif %}>Last 1 Minute</option>
+        <option value="last_5_minutes" {% if time_range == 'last_5_minutes' %}selected{% endif %}>Last 5 Minutes</option>
+        <option value="last_10_minutes" {% if time_range == 'last_10_minutes' %}selected{% endif %}>Last 10 Minutes</option>
+        <option value="last_hour" {% if time_range == 'last_hour' %}selected{% endif %}>Last Hour</option>
+        <option value="last_6_hours" {% if time_range == 'last_6_hours' %}selected{% endif %}>Last 6 Hours</option>
+        <option value="last_12_hours" {% if time_range == 'last_12_hours' %}selected{% endif %}>Last 12 Hours</option>
+        <option value="last_day" {% if time_range == 'last_day' %}selected{% endif %}>Last Day</option>
+        <option value="last_30_days" {% if time_range == 'last_30_days' %}selected{% endif %}>Last 30 Days</option>
+        <option value="all" {% if time_range == 'all' %}selected{% endif %}>All Time</option>
+    </select>
+    <button type="submit">Update</button>
+</form>
 
-  <div class="card error-card">
-    <h2>Recent Access-Reject</h2>
-    <table class="styled-table small-table">
-      <thead>
-        <tr>
-          <th>MAC Address</th>
-          <th>Description</th>
-          <th>Vendor</th>
-          <th>Time</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for entry in reject_entries %}
-        <tr>
-          <td>{{ entry.mac_address }}</td>
-          <td>{{ entry.description or '' }}</td>
-          <td>{{ entry.vendor }}</td>
-          <td>{{ entry.ago }}</td>
-          <td>
-            {% if entry.already_exists %}
-              <span style="color: limegreen;">Already exists in VLAN {{ entry.existing_vlan or 'unknown' }}</span>
-            {% else %}
-              <form method="POST" action="/user/add_from_reject" style="display: flex; gap: 4px;">
-                <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
-                <select name="group_id" required>
-                  <option value="">Select VLAN</option>
-                  {% for group in available_groups %}
-                  <option value="{{ group.id }}">VLAN {{ group.vlan_id }}</option>
-                  {% endfor %}
-                </select>
-                <button type="submit" title="Add User">💾</button>
-              </form>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+<div class="stats-container">
+    <!-- Access-Accept Card -->
+    <div class="card success-card">
+        <h2>Recent Access-Accept</h2>
+        <table class="styled-table small-table">
+            <thead>
+                <tr>
+                    <th>MAC Address</th>
+                    <th>Description</th>
+                    <th>Vendor</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in accept_entries %}
+                <tr>
+                    <td>{{ entry.mac_address }}</td>
+                    <td>{{ entry.description or '' }}</td>
+                    <td>{{ entry.vendor }}</td>
+                    <td>{{ entry.ago }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Access-Reject Card -->
+    <div class="card error-card">
+        <h2>Recent Access-Reject</h2>
+        <table class="styled-table small-table">
+            <thead>
+                <tr>
+                    <th>MAC Address</th>
+                    <th>Description</th>
+                    <th>Vendor</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in reject_entries %}
+                <tr>
+                    <td>{{ entry.mac_address }}</td>
+                    <td>{{ entry.description or '' }}</td>
+                    <td>{{ entry.vendor }}</td>
+                    <td>{{ entry.ago }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Access-Fallback Card -->
+    <div class="card fallback-card">
+        <h2>Recent Access-Fallback</h2>
+        <table class="styled-table small-table">
+            <thead>
+                <tr>
+                    <th>MAC Address</th>
+                    <th>Description</th>
+                    <th>Vendor</th>
+                    <th>Time</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if fallback_entries %}
+                {% for entry in fallback_entries %}
+                <tr>
+                    <td>{{ entry.mac_address }}</td>
+                
+                    <td>
+                        {% if not entry.already_exists %}
+                            <input type="text" name="description" value="{{ entry.description or '' }}" placeholder="Description (optional)" form="form-{{ loop.index }}">
+                        {% else %}
+                            {{ entry.description or '' }}
+                        {% endif %}
+                    </td>
+                
+                    <td>{{ entry.vendor }}</td>
+                    <td>{{ entry.ago }}</td>
+                
+                    <td>
+                        {% if not entry.already_exists %}
+                            <form method="POST" action="{{ url_for('stats.add') }}" class="inline-form" id="form-{{ loop.index }}">
+                                <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
+                                <select name="group_id" required>
+                                    <option value="">Assign to VLAN</option>
+                                    {% for group in available_groups %}
+                                    <option value="{{ group.vlan_id }}">VLAN {{ group.vlan_id }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" title="Add">💾</button>
+                            </form>
+                        {% else %}
+                            <span style="color: limegreen;">Already exists in VLAN {{ entry.existing_vlan or 'unknown' }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                    <tr><td colspan="5">No data available.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
 </div>
 
-<style>
-.stats-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2rem;
-}
-.card {
-  flex: 1;
-  min-width: 45%;
-  padding: 1rem;
-  border-radius: 8px;
-  background-color: var(--card-bg);
-  color: var(--fg);
-  box-shadow: 0 0 10px rgba(0,0,0,0.2);
-}
-.success-card {
-  border-left: 6px solid limegreen;
-}
-.error-card {
-  border-left: 6px solid crimson;
-}
-.styled-table.small-table td, .styled-table.small-table th {
-  padding: 6px;
-  font-size: 0.9rem;
-}
-</style>
+</div> {# closes .stats-page #}
 {% endblock %}

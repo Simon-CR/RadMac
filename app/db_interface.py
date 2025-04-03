@@ -4,14 +4,8 @@ import datetime
 import requests
 import time
 import os
-
-def get_connection():
-    return mysql.connector.connect(
-        host=current_app.config['DB_HOST'],
-        user=current_app.config['DB_USER'],
-        password=current_app.config['DB_PASSWORD'],
-        database=current_app.config['DB_NAME']
-    )
+import pytz
+from db_connection import get_connection
 
 
 def get_all_users():
@@ -45,10 +39,10 @@ def get_all_groups():
         FROM groups g
         ORDER BY g.vlan_id
     """)
-    groups = cursor.fetchall()
+    available_groups = cursor.fetchall()
     cursor.close()
     conn.close()
-    return groups
+    return available_groups
 
 
 
@@ -106,6 +100,7 @@ def duplicate_group(vlan_id):
 
 
 def add_user(mac_address, description, vlan_id):
+    print(f"→ Adding to DB: mac={mac_address}, desc={description}, vlan={vlan_id}")
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
@@ -144,17 +139,59 @@ def delete_user(mac_address):
     conn.close()
 
 
-def get_latest_auth_logs(result, limit=10):
+def get_latest_auth_logs(reply_type=None, limit=5, time_range=None):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute(
-        "SELECT * FROM auth_logs WHERE result = %s ORDER BY timestamp DESC LIMIT %s",
-        (result, limit)
-    )
+
+    # Determine the time filter based on the time_range
+    if time_range:
+        now = datetime.now(pytz.timezone(current_app.config.get('APP_TIMEZONE', 'UTC')))
+        if time_range == 'last_minute':
+            time_filter = now - timedelta(minutes=1)
+        elif time_range == 'last_5_minutes':
+            time_filter = now - timedelta(minutes=5)
+        elif time_range == 'last_10_minutes':
+            time_filter = now - timedelta(minutes=10)
+        elif time_range == 'last_hour':
+            time_filter = now - timedelta(hours=1)
+        elif time_range == 'last_6_hours':
+            time_filter = now - timedelta(hours=6)
+        elif time_range == 'last_12_hours':
+            time_filter = now - timedelta(hours=12)
+        elif time_range == 'last_day':
+            time_filter = now - timedelta(days=1)
+        elif time_range == 'last_30_days':
+            time_filter = now - timedelta(days=30)
+        else:  # 'all' case
+            time_filter = None
+
+        if time_filter:
+            cursor.execute("""
+                SELECT * FROM auth_logs
+                WHERE reply = %s AND timestamp >= %s
+                ORDER BY timestamp DESC
+                LIMIT %s
+            """, (reply_type, time_filter, limit))
+        else:
+            cursor.execute("""
+                SELECT * FROM auth_logs
+                WHERE reply = %s
+                ORDER BY timestamp DESC
+                LIMIT %s
+            """, (reply_type, limit))
+    else:
+        cursor.execute("""
+            SELECT * FROM auth_logs
+            WHERE reply = %s
+            ORDER BY timestamp DESC
+            LIMIT %s
+        """, (reply_type, limit))
+
     logs = cursor.fetchall()
     cursor.close()
     conn.close()
     return logs
+
 
 
 def get_vendor_info(mac, insert_if_found=True):
@@ -410,3 +447,14 @@ def lookup_mac_verbose(mac):
     conn.close()
     return "\n".join(output)
 
+def get_user_by_mac(mac_address):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT * FROM users WHERE mac_address = %s
+    """, (mac_address,))
+    user = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    return user
