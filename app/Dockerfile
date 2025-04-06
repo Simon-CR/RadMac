@@ -29,4 +29,4 @@ COPY . .
 EXPOSE 8080
 
 # Run the app via Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "wsgi:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "wsgi:app", "--timeout", "120", "--workers", "2"]

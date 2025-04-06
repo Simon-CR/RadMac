@@ -1,8 +1,11 @@
-from flask import Blueprint, render_template, request, current_app, redirect, url_for
-from db_interface import get_latest_auth_logs, get_all_groups, get_vendor_info, get_user_by_mac, add_user
+from flask import Blueprint, render_template, request, current_app, redirect, url_for, jsonify
+from db_interface import get_latest_auth_logs, count_auth_logs, get_all_groups, get_vendor_info, get_user_by_mac, add_user, get_known_mac_vendors
+from math import ceil
 import pytz
 import humanize
 from datetime import datetime, timezone, timedelta
+from time import sleep
+import threading
 
 stats = Blueprint('stats', __name__)
 
@@ -21,32 +24,47 @@ def get_time_filter_delta(time_range):
 @stats.route('/stats', methods=['GET', 'POST'])
 def stats_page():
     time_range = request.form.get('time_range') or request.args.get('time_range') or 'last_minute'
-    limit = 1000  # Fetch enough to allow filtering by time later
+
+    # Per-card pagination values
+    per_page = 25
+    page_accept = int(request.args.get('page_accept', 1))
+    page_reject = int(request.args.get('page_reject', 1))
+    page_fallback = int(request.args.get('page_fallback', 1))
 
     # Timezone setup
     tz_name = current_app.config.get('APP_TIMEZONE', 'UTC')
     local_tz = pytz.timezone(tz_name)
 
-    def is_within_selected_range(ts):
-        if time_range == "all":
-            return True
-        delta = get_time_filter_delta(time_range)
-        if not delta or not ts:
-            return True
-        now = datetime.now(timezone.utc)
-        if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
-        return (now - ts) <= delta
+    # Accept pagination
+    total_accept = count_auth_logs('Access-Accept', time_range)
+    total_pages_accept = ceil(total_accept / per_page)
+    offset_accept = (page_accept - 1) * per_page
+    accept_entries = get_latest_auth_logs('Access-Accept', per_page, time_range, offset_accept)
+
+    # Reject pagination
+    total_reject = count_auth_logs('Access-Reject', time_range)
+    total_pages_reject = ceil(total_reject / per_page)
+    offset_reject = (page_reject - 1) * per_page
+    reject_entries = get_latest_auth_logs('Access-Reject', per_page, time_range, offset_reject)
+
+    # Fallback pagination
+    total_fallback = count_auth_logs('Accept-Fallback', time_range)
+    total_pages_fallback = ceil(total_fallback / per_page)
+    offset_fallback = (page_fallback - 1) * per_page
+    fallback_entries = get_latest_auth_logs('Accept-Fallback', per_page, time_range, offset_fallback)
 
     def enrich(entry):
-        if entry.get('timestamp') and entry['timestamp'].tzinfo is None:
-            entry['timestamp'] = entry['timestamp'].replace(tzinfo=timezone.utc)
+        ts = entry.get('timestamp')
+        if ts:
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            local_time = ts.astimezone(local_tz)
+            entry['ago'] = humanize.naturaltime(datetime.now(local_tz) - local_time)
+        else:
+            entry['ago'] = 'unknown'
 
-        local_time = entry['timestamp'].astimezone(local_tz)
-        entry['ago'] = humanize.naturaltime(datetime.now(local_tz) - local_time)
-
-        vendor_info = get_vendor_info(entry['mac_address']) or {}
-        entry['vendor'] = vendor_info.get('vendor', 'Unknown Vendor')
+        vendor_info = get_vendor_info(entry['mac_address'], insert_if_found=False)
+        entry['vendor'] = vendor_info['vendor'] if vendor_info else None  # placeholder
 
         user = get_user_by_mac(entry['mac_address'])
         entry['already_exists'] = user is not None
@@ -55,20 +73,29 @@ def stats_page():
 
         return entry
 
-    # Get and enrich logs after filtering
-    accept_entries = [enrich(e) for e in get_latest_auth_logs('Access-Accept', limit) if is_within_selected_range(e.get('timestamp'))]
-    reject_entries = [enrich(e) for e in get_latest_auth_logs('Access-Reject', limit) if is_within_selected_range(e.get('timestamp'))]
-    fallback_entries = [enrich(e) for e in get_latest_auth_logs('Accept-Fallback', limit) if is_within_selected_range(e.get('timestamp'))]
+    # Enrich entries
+    accept_entries = [enrich(e) for e in accept_entries]
+    reject_entries = [enrich(e) for e in reject_entries]
+    fallback_entries = [enrich(e) for e in fallback_entries]
 
     available_groups = get_all_groups()
 
     return render_template(
         "stats.html",
+        time_range=time_range,
         accept_entries=accept_entries,
         reject_entries=reject_entries,
         fallback_entries=fallback_entries,
         available_groups=available_groups,
-        time_range=time_range
+
+        page_accept=page_accept,
+        total_pages_accept=total_pages_accept,
+
+        page_reject=page_reject,
+        total_pages_reject=total_pages_reject,
+
+        page_fallback=page_fallback,
+        total_pages_fallback=total_pages_fallback
     )
 
 @stats.route('/add', methods=['POST'])
@@ -80,3 +107,42 @@ def add():
 
     add_user(mac, desc, group_id)
     return redirect(url_for('stats.stats_page'))
+
+@stats.route('/lookup_mac_async', methods=['POST'])
+def lookup_mac_async():
+    data = request.get_json()
+    macs = data.get('macs', [])
+    results = {}
+
+    rate_limit = int(current_app.config.get("OUI_API_LIMIT_PER_SEC", 2))
+    delay = 1.0 / rate_limit if rate_limit > 0 else 0.5
+
+    # Lowercase cleaned prefixes
+    prefixes_to_lookup = {}
+    for mac in macs:
+        prefix = mac.lower().replace(":", "").replace("-", "")[:6]
+        prefixes_to_lookup[prefix] = mac  # Use last MAC that used this prefix
+
+    known_vendors = get_known_mac_vendors()  # local DB cache
+    vendor_cache = {}  # cache during this request
+
+    for prefix, mac in prefixes_to_lookup.items():
+        if prefix in known_vendors:
+            results[mac] = known_vendors[prefix]['vendor']
+            continue
+
+        if prefix in vendor_cache:
+            print(f"→ Prefix {prefix} already queried in this request, skipping.")
+            results[mac] = vendor_cache[prefix]
+            continue
+
+        info = get_vendor_info(mac)  # will insert into DB
+        vendor_name = info.get('vendor', '')
+        vendor_cache[prefix] = vendor_name
+        results[mac] = vendor_name
+
+        sleep(delay)  # throttle
+
+    return jsonify(results)
+
+

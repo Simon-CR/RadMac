@@ -3,10 +3,9 @@
 
 {% block content %}
 <div class="stats-page">
-
 <h1 class="page-title">Authentication Stats</h1>
 
-<form method="POST" action="/stats/stats">
+<form method="POST" action="{{ url_for('stats.stats_page') }}">
     <label for="time_range">Select Time Range:</label>
     <select name="time_range" id="time_range">
         <option value="last_minute" {% if time_range == 'last_minute' %}selected{% endif %}>Last 1 Minute</option>
@@ -23,6 +22,7 @@
 </form>
 
 <div class="stats-container">
+
     <!-- Access-Accept Card -->
     <div class="card success-card">
         <h2>Recent Access-Accept</h2>
@@ -40,12 +40,23 @@
                 <tr>
                     <td>{{ entry.mac_address }}</td>
                     <td>{{ entry.description or '' }}</td>
-                    <td>{{ entry.vendor }}</td>
+                    <td class="vendor-cell" data-mac="{{ entry.mac_address }}">{{ entry.vendor or '...' }}</td>
                     <td>{{ entry.ago }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        {% if total_pages_accept > 1 %}
+        <div class="pagination">
+            {% for page in range(1, total_pages_accept + 1) %}
+                {% if page == page_accept %}
+                    <span class="current-page">{{ page }}</span>
+                {% else %}
+                    <a href="{{ url_for('stats.stats_page', page_accept=page, page_reject=page_reject, page_fallback=page_fallback, time_range=time_range) }}">{{ page }}</a>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 
     <!-- Access-Reject Card -->
@@ -65,12 +76,23 @@
                 <tr>
                     <td>{{ entry.mac_address }}</td>
                     <td>{{ entry.description or '' }}</td>
-                    <td>{{ entry.vendor }}</td>
+                    <td class="vendor-cell" data-mac="{{ entry.mac_address }}">{{ entry.vendor or '...' }}</td>
                     <td>{{ entry.ago }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        {% if total_pages_reject > 1 %}
+        <div class="pagination">
+            {% for page in range(1, total_pages_reject + 1) %}
+                {% if page == page_reject %}
+                    <span class="current-page">{{ page }}</span>
+                {% else %}
+                    <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=page, page_fallback=page_fallback, time_range=time_range) }}">{{ page }}</a>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 
     <!-- Access-Fallback Card -->
@@ -87,11 +109,9 @@
                 </tr>
             </thead>
             <tbody>
-                {% if fallback_entries %}
                 {% for entry in fallback_entries %}
                 <tr>
                     <td>{{ entry.mac_address }}</td>
-                
                     <td>
                         {% if not entry.already_exists %}
                             <input type="text" name="description" value="{{ entry.description or '' }}" placeholder="Description (optional)" form="form-{{ loop.index }}">
@@ -99,35 +119,73 @@
                             {{ entry.description or '' }}
                         {% endif %}
                     </td>
-                
-                    <td>{{ entry.vendor }}</td>
+                    <td class="vendor-cell" data-mac="{{ entry.mac_address }}">{{ entry.vendor or '...' }}</td>
                     <td>{{ entry.ago }}</td>
-                
                     <td>
                         {% if not entry.already_exists %}
-                            <form method="POST" action="{{ url_for('stats.add') }}" class="inline-form" id="form-{{ loop.index }}">
-                                <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
-                                <select name="group_id" required>
-                                    <option value="">Assign to VLAN</option>
-                                    {% for group in available_groups %}
-                                    <option value="{{ group.vlan_id }}">VLAN {{ group.vlan_id }}</option>
-                                    {% endfor %}
-                                </select>
-                                <button type="submit" title="Add">💾</button>
-                            </form>
+                        <form method="POST" action="{{ url_for('stats.add') }}" class="inline-form" id="form-{{ loop.index }}">
+                            <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
+                            <select name="group_id" required>
+                                <option value="">Assign to VLAN</option>
+                                {% for group in available_groups %}
+                                <option value="{{ group.vlan_id }}">VLAN {{ group.vlan_id }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" title="Add">💾</button>
+                        </form>
                         {% else %}
-                            <span style="color: limegreen;">Already exists in VLAN {{ entry.existing_vlan or 'unknown' }}</span>
+                        <span style="color: limegreen;">Already exists in VLAN {{ entry.existing_vlan or 'unknown' }}</span>
                         {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
-                {% else %}
-                    <tr><td colspan="5">No data available.</td></tr>
-                {% endif %}
             </tbody>
         </table>
+        {% if total_pages_fallback > 1 %}
+        <div class="pagination">
+            {% for page in range(1, total_pages_fallback + 1) %}
+                {% if page == page_fallback %}
+                    <span class="current-page">{{ page }}</span>
+                {% else %}
+                    <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=page_reject, page_fallback=page, time_range=time_range) }}">{{ page }}</a>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 </div>
+</div>
 
-</div> {# closes .stats-page #}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const queriedPrefixes = new Set();
+        document.querySelectorAll('.vendor-cell').forEach(cell => {
+            const mac = cell.getAttribute('data-mac');
+            if (cell.textContent.trim() === '...') {
+                const prefix = mac.replace(/[^a-fA-F0-9]/g, '').substring(0, 6).toLowerCase();
+                if (queriedPrefixes.has(prefix)) return;
+                queriedPrefixes.add(prefix);
+    
+                fetch('{{ url_for("stats.lookup_mac_async") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mac })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.vendor) {
+                        document.querySelectorAll(`.vendor-cell[data-mac^="${prefix}"]`).forEach(c => {
+                            if (c.textContent.trim() === '...') {
+                                c.textContent = data.vendor;
+                            }
+                        });
+                    }
+                })
+                .catch(err => {
+                    console.warn('MAC lookup failed:', err);
+                });
+            }
+        });
+    });
+</script>
 {% endblock %}

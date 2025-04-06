@@ -7,8 +7,8 @@ user = Blueprint('user', __name__, url_prefix='/user')
 @user.route('/')
 def user_list():
     users = get_all_users()
-    groups = get_all_groups()
-    return render_template('user_list.html', users=users, groups=groups)
+    available_groups = get_all_groups()
+    return render_template('user_list.html', users=users, available_groups=available_groups)
 
 
 @user.route('/add', methods=['POST'])

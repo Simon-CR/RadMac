@@ -1,6 +1,6 @@
 from flask import current_app
 import mysql.connector
-import datetime
+from datetime import datetime, timedelta, timezone
 import requests
 import time
 import os
@@ -139,149 +139,83 @@ def delete_user(mac_address):
     conn.close()
 
 
-def get_latest_auth_logs(reply_type=None, limit=5, time_range=None):
+def get_latest_auth_logs(reply_type=None, limit=5, time_range=None, offset=0):
     conn = get_connection()
     cursor = conn.cursor(dictionary=True)
 
-    # Determine the time filter based on the time_range
-    if time_range:
-        now = datetime.now(pytz.timezone(current_app.config.get('APP_TIMEZONE', 'UTC')))
-        if time_range == 'last_minute':
-            time_filter = now - timedelta(minutes=1)
-        elif time_range == 'last_5_minutes':
-            time_filter = now - timedelta(minutes=5)
-        elif time_range == 'last_10_minutes':
-            time_filter = now - timedelta(minutes=10)
-        elif time_range == 'last_hour':
-            time_filter = now - timedelta(hours=1)
-        elif time_range == 'last_6_hours':
-            time_filter = now - timedelta(hours=6)
-        elif time_range == 'last_12_hours':
-            time_filter = now - timedelta(hours=12)
-        elif time_range == 'last_day':
-            time_filter = now - timedelta(days=1)
-        elif time_range == 'last_30_days':
-            time_filter = now - timedelta(days=30)
-        else:  # 'all' case
-            time_filter = None
+    now = datetime.now(pytz.timezone(current_app.config.get('APP_TIMEZONE', 'UTC')))
+    time_filter = None
 
-        if time_filter:
-            cursor.execute("""
-                SELECT * FROM auth_logs
-                WHERE reply = %s AND timestamp >= %s
-                ORDER BY timestamp DESC
-                LIMIT %s
-            """, (reply_type, time_filter, limit))
-        else:
-            cursor.execute("""
-                SELECT * FROM auth_logs
-                WHERE reply = %s
-                ORDER BY timestamp DESC
-                LIMIT %s
-            """, (reply_type, limit))
+    if time_range and time_range != 'all':
+        delta = {
+            'last_minute': timedelta(minutes=1),
+            'last_5_minutes': timedelta(minutes=5),
+            'last_10_minutes': timedelta(minutes=10),
+            'last_hour': timedelta(hours=1),
+            'last_6_hours': timedelta(hours=6),
+            'last_12_hours': timedelta(hours=12),
+            'last_day': timedelta(days=1),
+            'last_30_days': timedelta(days=30)
+        }.get(time_range)
+        if delta:
+            time_filter = now - delta
+
+    if time_filter:
+        cursor.execute("""
+            SELECT * FROM auth_logs
+            WHERE reply = %s AND timestamp >= %s
+            ORDER BY timestamp DESC
+            LIMIT %s OFFSET %s
+        """, (reply_type, time_filter, limit, offset))
     else:
         cursor.execute("""
             SELECT * FROM auth_logs
             WHERE reply = %s
             ORDER BY timestamp DESC
-            LIMIT %s
-        """, (reply_type, limit))
+            LIMIT %s OFFSET %s
+        """, (reply_type, limit, offset))
 
     logs = cursor.fetchall()
     cursor.close()
     conn.close()
     return logs
 
-
-
-def get_vendor_info(mac, insert_if_found=True):
+def count_auth_logs(reply_type=None, time_range=None):
     conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    prefix = mac.lower().replace(":", "").replace("-", "")[:6]
+    cursor = conn.cursor()
 
-    print(f">>> Looking up MAC: {mac} → Prefix: {prefix}")
-    print("→ Searching in local database...")
-    cursor.execute("SELECT vendor_name, status FROM mac_vendors WHERE mac_prefix = %s", (prefix,))
-    row = cursor.fetchone()
+    now = datetime.now(pytz.timezone(current_app.config.get('APP_TIMEZONE', 'UTC')))
+    time_filter = None
 
-    if row:
-        print(f"✓ Found locally: {row['vendor_name']} (Status: {row['status']})")
-        cursor.close()
-        conn.close()
-        return {
-            "mac": mac,
-            "vendor": row['vendor_name'],
-            "source": "local",
-            "status": row['status']
-        }
+    if time_range and time_range != 'all':
+        delta = {
+            'last_minute': timedelta(minutes=1),
+            'last_5_minutes': timedelta(minutes=5),
+            'last_10_minutes': timedelta(minutes=10),
+            'last_hour': timedelta(hours=1),
+            'last_6_hours': timedelta(hours=6),
+            'last_12_hours': timedelta(hours=12),
+            'last_day': timedelta(days=1),
+            'last_30_days': timedelta(days=30)
+        }.get(time_range)
+        if delta:
+            time_filter = now - delta
 
-    print("✗ Not found locally, querying API...")
+    if time_filter:
+        cursor.execute("""
+            SELECT COUNT(*) FROM auth_logs
+            WHERE reply = %s AND timestamp >= %s
+        """, (reply_type, time_filter))
+    else:
+        cursor.execute("""
+            SELECT COUNT(*) FROM auth_logs
+            WHERE reply = %s
+        """, (reply_type,))
 
-    url_template = current_app.config.get("OUI_API_URL", "https://api.maclookup.app/v2/macs/{}")
-    api_key = current_app.config.get("OUI_API_KEY", "")
-    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
-
-    try:
-        url = url_template.format(prefix)
-        print(f"→ Querying API: {url}")
-        response = requests.get(url, headers=headers)
-
-        if response.status_code == 200:
-            data = response.json()
-            vendor = data.get("company", "").strip()
-            if vendor:
-                print(f"✓ Found from API: {vendor}")
-                if insert_if_found:
-                    cursor.execute("""
-                        INSERT INTO mac_vendors (mac_prefix, vendor_name, status, last_checked, last_updated)
-                        VALUES (%s, %s, 'found', NOW(), NOW())
-                        ON DUPLICATE KEY UPDATE
-                            vendor_name = VALUES(vendor_name),
-                            status = 'found',
-                            last_checked = NOW(),
-                            last_updated = NOW()
-                    """, (prefix, vendor))
-                    conn.commit()
-                    print("→ Inserted into database (found).")
-                return {
-                    "mac": mac,
-                    "vendor": vendor,
-                    "source": "api",
-                    "status": "found"
-                }
-
-        elif response.status_code == 404:
-            print("✗ API returned 404 - vendor not found.")
-            if insert_if_found:
-                cursor.execute("""
-                    INSERT INTO mac_vendors (mac_prefix, vendor_name, status, last_checked, last_updated)
-                    VALUES (%s, %s, 'not_found', NOW(), NOW())
-                    ON DUPLICATE KEY UPDATE
-                        vendor_name = VALUES(vendor_name),
-                        status = 'not_found',
-                        last_checked = NOW(),
-                        last_updated = NOW()
-                """, (prefix, "not found"))
-                conn.commit()
-                print("→ Inserted into database (not_found).")
-            return {
-                "mac": mac,
-                "vendor": "",
-                "source": "api",
-                "status": "not_found"
-            }
-
-        else:
-            print(f"✗ API error: {response.status_code}")
-            return {"mac": mac, "vendor": "", "error": f"API error: {response.status_code}"}
-
-    except Exception as e:
-        print(f"✗ Exception while querying API: {e}")
-        return {"mac": mac, "vendor": "", "error": str(e)}
-
-    finally:
-        cursor.close()
-        conn.close()
+    count = cursor.fetchone()[0]
+    cursor.close()
+    conn.close()
+    return count
 
 def get_summary_counts():
     conn = get_connection()
@@ -458,3 +392,133 @@ def get_user_by_mac(mac_address):
     cursor.close()
     conn.close()
     return user
+
+def get_known_mac_vendors():
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT mac_prefix, vendor_name, status FROM mac_vendors")
+    entries = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    return {
+        row['mac_prefix'].lower(): {
+            'vendor': row['vendor_name'],
+            'status': row['status']
+        }
+        for row in entries
+    }
+
+def get_vendor_info(mac, insert_if_found=True):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    prefix = mac.lower().replace(":", "").replace("-", "")[:6]
+
+    print(f">>> Looking up MAC: {mac} → Prefix: {prefix}")
+    print("→ Searching in local database...")
+    cursor.execute("SELECT vendor_name, status FROM mac_vendors WHERE mac_prefix = %s", (prefix,))
+    row = cursor.fetchone()
+
+    if row:
+        print(f"✓ Found locally: {row['vendor_name']} (Status: {row['status']})")
+        cursor.close()
+        conn.close()
+        return {
+            "mac": mac,
+            "vendor": row['vendor_name'],
+            "source": "local",
+            "status": row['status']
+        }
+
+    print("✗ Not found locally, querying API...")
+
+    url_template = current_app.config.get("OUI_API_URL", "https://api.maclookup.app/v2/macs/{}")
+    api_key = current_app.config.get("OUI_API_KEY", "")
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+
+    try:
+        url = url_template.format(prefix)
+        print(f"→ Querying API: {url}")
+        response = requests.get(url, headers=headers)
+
+        if response.status_code == 200:
+            data = response.json()
+            vendor = data.get("company", "").strip()
+
+            if vendor:
+                print(f"✓ Found from API: {vendor}")
+
+                # Always insert found results, even if insert_if_found=False
+                cursor.execute("""
+                    INSERT INTO mac_vendors (mac_prefix, vendor_name, status, last_checked, last_updated)
+                    VALUES (%s, %s, 'found', NOW(), NOW())
+                    ON DUPLICATE KEY UPDATE
+                        vendor_name = VALUES(vendor_name),
+                        status = 'found',
+                        last_checked = NOW(),
+                        last_updated = NOW()
+                """, (prefix, vendor))
+                print(f"→ Inserted vendor: {vendor} → rowcount: {cursor.rowcount}")
+                conn.commit()
+
+                return {
+                    "mac": mac,
+                    "vendor": vendor,
+                    "source": "api",
+                    "status": "found"
+                }
+
+            else:
+                print("⚠️ API returned empty company field. Treating as not_found.")
+                # 🛠 Always insert not_found, even if insert_if_found=False
+                cursor.execute("""
+                    INSERT INTO mac_vendors (mac_prefix, vendor_name, status, last_checked, last_updated)
+                    VALUES (%s, %s, 'not_found', NOW(), NOW())
+                    ON DUPLICATE KEY UPDATE
+                        vendor_name = VALUES(vendor_name),
+                        status = 'not_found',
+                        last_checked = NOW(),
+                        last_updated = NOW()
+                """, (prefix, "not found"))
+                print(f"→ Inserted not_found for {prefix} → rowcount: {cursor.rowcount}")
+                conn.commit()
+                return {
+                    "mac": mac,
+                    "vendor": "",
+                    "source": "api",
+                    "status": "not_found"
+                }
+
+        elif response.status_code == 404:
+            print("✗ API returned 404 - vendor not found.")
+            # 🛠 Always insert not_found
+            cursor.execute("""
+                INSERT INTO mac_vendors (mac_prefix, vendor_name, status, last_checked, last_updated)
+                VALUES (%s, %s, 'not_found', NOW(), NOW())
+                ON DUPLICATE KEY UPDATE
+                    vendor_name = VALUES(vendor_name),
+                    status = 'not_found',
+                    last_checked = NOW(),
+                    last_updated = NOW()
+            """, (prefix, "not found"))
+            print(f"→ Inserted not_found (404) for {prefix} → rowcount: {cursor.rowcount}")
+            conn.commit()
+            return {
+                "mac": mac,
+                "vendor": "",
+                "source": "api",
+                "status": "not_found"
+            }
+
+        else:
+            print(f"✗ API error: {response.status_code}")
+            return {"mac": mac, "vendor": "", "error": f"API error: {response.status_code}"}
+
+    except Exception as e:
+        print(f"✗ Exception while querying API: {e}")
+        return {"mac": mac, "vendor": "", "error": str(e)}
+
+    finally:
+        cursor.close()
+        conn.close()
+

@@ -294,3 +294,26 @@ form.inline-form {
   flex: 0 0 auto;
   padding: 6px;
 }
+
+.pagination {
+  margin-top: 0.75rem;
+  text-align: center;
+}
+
+.pagination a,
+.pagination span.current-page {
+  display: inline-block;
+  padding: 4px 10px;
+  margin: 0 3px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--fg);
+  background-color: transparent;
+  text-decoration: none;
+}
+
+.pagination span.current-page {
+  font-weight: bold;
+  background-color: var(--accent);
+  color: black;
+}
