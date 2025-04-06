@@ -36,7 +36,7 @@
           <input type="hidden" name="description" value="{{ group.description }}">
           <button type="submit" title="Save">💾</button>
         </form>
-        <form method="POST" action="{{ url_for('group.delete_group_route') }}" class="preserve-scroll" style="display:inline;" onsubmit="return confirm('Delete this group?');">
+        <form method="POST" action="{{ url_for('group.delete_group_route_handler') }}" class="preserve-scroll delete-group-form" data-user-count="{{ group.user_count }}" style="display:inline;">
           <input type="hidden" name="group_id" value="{{ group.vlan_id }}">
           <button type="submit">❌</button>
         </form>
@@ -45,6 +45,22 @@
     {% endfor %}
   </tbody>
 </table>
+
+<!-- Modal for confirm delete -->
+<div id="confirmModal" class="modal" style="display: none;">
+  <div class="modal-content">
+    <p>This group has users assigned. What would you like to do?</p>
+    <div id="userList" class="user-list"></div>
+    <div class="modal-actions">
+      <button onclick="closeModal()">Cancel</button>
+      <form id="confirmDeleteForm" method="POST" action="{{ url_for('group.delete_group_route_handler') }}">
+        <input type="hidden" name="group_id" id="modalGroupId">
+        <input type="hidden" name="force_delete" value="true">
+        <button type="submit" class="danger">Delete Group and Users</button>
+      </form>
+    </div>
+  </div>
+</div>
 
 <script>
   document.querySelectorAll('form.preserve-scroll').forEach(form => {
@@ -59,5 +75,47 @@
       localStorage.removeItem('scrollY');
     }
   });
+
+  document.querySelectorAll('.delete-group-form').forEach(form => {
+    form.addEventListener('submit', function (e) {
+      const userCount = parseInt(this.dataset.userCount);
+      const groupId = this.querySelector('[name="group_id"]').value;
+
+      if (userCount > 0) {
+        e.preventDefault();
+        fetch('{{ url_for("group.get_users_for_group") }}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ vlan_id: groupId })
+        })
+        .then(resp => resp.json())
+        .then(users => {
+          const userListDiv = document.getElementById('userList');
+          userListDiv.innerHTML = '';
+
+          if (users.length > 0) {
+            const list = document.createElement('ul');
+            users.forEach(user => {
+              const item = document.createElement('li');
+              item.textContent = `${user.mac_address} — ${user.description || 'No description'}`;
+              list.appendChild(item);
+            });
+            userListDiv.appendChild(list);
+          } else {
+            userListDiv.textContent = 'No users found in this group.';
+          }
+
+          document.getElementById('modalGroupId').value = groupId;
+          document.getElementById('confirmModal').style.display = 'flex';
+        });
+      } else {
+        if (!confirm('Delete this group?')) e.preventDefault();
+      }
+    });
+  });
+
+  function closeModal() {
+    document.getElementById('confirmModal').style.display = 'none';
+  }
 </script>
 {% endblock %}

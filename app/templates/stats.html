@@ -128,9 +128,11 @@
                             <select name="group_id" required>
                                 <option value="">Assign to VLAN</option>
                                 {% for group in available_groups %}
-                                <option value="{{ group.vlan_id }}">VLAN {{ group.vlan_id }}</option>
+                                <option value="{{ group.vlan_id }}">
+                                  VLAN {{ group.vlan_id }}{% if group.description %} - {{ group.description }}{% endif %}
+                                </option>
                                 {% endfor %}
-                            </select>
+                              </select>
                             <button type="submit" title="Add">💾</button>
                         </form>
                         {% else %}

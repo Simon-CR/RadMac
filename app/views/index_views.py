@@ -5,6 +5,7 @@ from db_interface import (
     get_vendor_info,
     get_latest_auth_logs,
     get_all_groups,
+    lookup_mac_verbose,
 )
 import pytz
 

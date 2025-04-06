@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, request, redirect, url_for
-from db_interface import get_all_groups, add_group, update_group_description, delete_group
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from db_interface import get_all_groups, add_group, update_group_description, delete_group_route, get_users_by_vlan_id
 
 group = Blueprint('group', __name__, url_prefix='/group')
 
@@ -27,7 +27,11 @@ def update_description_route():
 
 
 @group.route('/delete', methods=['POST'])
-def delete_group_route():
-    group_id = request.form['group_id']
-    delete_group(group_id)
-    return redirect(url_for('group.group_list'))
+def delete_group_route_handler():
+    return delete_group_route()
+
+@group.route('/get_users_for_group', methods=['POST'])
+def get_users_for_group():
+    vlan_id = request.form.get('vlan_id')
+    users = get_users_by_vlan_id(vlan_id)
+    return jsonify(users)
