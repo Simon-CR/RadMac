@@ -44,11 +44,11 @@ services:
       - app
     restart: unless-stopped
 
-    adminer:
-      image: adminer
-      restart: unless-stopped
-      ports:
-        - "8081:8080"  
+  adminer:
+    image: adminer
+    restart: unless-stopped
+    ports:
+      - "8081:8080"  
 
 volumes:
   db_data:
