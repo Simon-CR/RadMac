@@ -1,32 +1,21 @@
 ---
 
 services:
-
   db:
-    image: mariadb:11
+    image: simonclr/radmac-db:latest
     restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: radius
-      MYSQL_USER: radiususer
-      MYSQL_PASSWORD: radiuspass
+    ports:
+      - "3306:3306"
     volumes:
       - db_data:/var/lib/mysql
-      - ./db/conf.d:/etc/mysql/conf.d
-      - ./db/init:/docker-entrypoint-initdb.d
-    ports:
-      - "3306:3306"  # Exposed for dev access
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       start_period: 10s
       interval: 10s
       timeout: 5s
       retries: 3
-
   radius:
-    build:
-      context: ./radius
-      dockerfile: Dockerfile
+    image: simonclr/radmac-radius:latest
     depends_on:
       db:
         condition: service_healthy
@@ -35,23 +24,10 @@ services:
     ports:
       - "1812:1812/udp"
     restart: unless-stopped
-
-
-
-
-  adminer:
-    image: adminer
-    restart: unless-stopped
-    ports:
-      - "8081:8080"     
   app:
-    build:
-      context: ./app
-      dockerfile: Dockerfile
-      args:
-        TIMEZONE: ${APP_TIMEZONE}
+    image: simonclr/radmac-app:latest
     volumes:
-      - ./app:/app
+      - ./app:/app  # Optional: remove if not needed for production
     env_file:
       - .env
     environment:
@@ -63,14 +39,18 @@ services:
       db:
         condition: service_healthy
   nginx:
-    build:
-      context: ./nginx
-      dockerfile: Dockerfile
+    image: simonclr/radmac-nginx:latest
     ports:
       - "8080:80"
     depends_on:
       - app
     restart: unless-stopped
+
+    adminer:
+      image: adminer
+      restart: unless-stopped
+      ports:
+        - "8081:8080"  
 
 volumes:
   db_data:
