@@ -14,8 +14,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-      networks:
-        - webnet
+    networks:
+      - webnet
   radius:
     image: simonclr/radmac-radius:latest
     depends_on:
