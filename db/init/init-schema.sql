@@ -1,5 +1,16 @@
--- init-schema.sql
+-- Create the database if it doesn't exist
+CREATE DATABASE IF NOT EXISTS radius;
 USE radius;
+
+-- Create the user if it doesn't exist
+CREATE USER IF NOT EXISTS 'radiususer'@'%' IDENTIFIED BY 'radiuspass';
+
+-- Grant permissions to the user
+GRANT ALL PRIVILEGES ON radius.* TO 'radiususer'@'%';
+
+-- Apply the changes
+FLUSH PRIVILEGES;
+
 -- Table for registered users (MAC-based auth)
 CREATE TABLE IF NOT EXISTS users (
     mac_address CHAR(12) NOT NULL PRIMARY KEY CHECK (mac_address REGEXP '^[0-9A-Fa-f]{12}$'),
