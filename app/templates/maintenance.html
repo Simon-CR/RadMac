@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block title %}Maintenance{% endblock %}
+{% block content %}
+    <h1>Database Maintenance</h1>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-messages">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+    
+    <p>Perform common database maintenance tasks here.</p>
+
+    <hr>
+
+    <h2>Database Statistics</h2>
+    <div class="database-stats">
+        {% if table_stats %}
+            {% for table, row_count in table_stats.items() %}
+                <div class="card">
+                    <div class="card-header">{{ table }}</div>
+                    <div class="card-body">
+                        <p>Number of rows: {{ row_count }}</p>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>Could not retrieve database statistics.</p>
+        {% endif %}
+    </div>
+
+    <hr>
+
+    <h2>Clear Authentication Logs</h2>
+    <p>Permanently remove all authentication logs from the database.  This action cannot be undone.</p>
+    <form action="/maintenance/clear_auth_logs" method="post">
+        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to clear all authentication logs? This action is irreversible!')">
+            Clear Logs
+        </button>
+    </form>
+
+    <hr>
+
+    <h2>Database Backup</h2>
+    <p>Create a backup of the current database. The backup will be saved as a SQL file.</p>
+    <p style="color: red;">
+        Warning: Database backups can be very large if you do not clear the authentication logs first.
+    </p>
+    <form action="/maintenance/backup_database" method="get">
+        <button type="submit" class="btn btn-primary">Backup Database</button>
+    </form>
+
+    <hr>
+
+    <h2>Database Restore</h2>
+    <p>Restore the database from a previously created SQL backup file.  This will overwrite the current database.</p>
+    <form action="/maintenance/restore_database" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept=".sql" required>
+        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to restore the database from this file?  This will OVERWRITE the current database.')">
+            Restore Database
+        </button>
+    </form>
+{% endblock %}

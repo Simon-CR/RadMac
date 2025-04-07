@@ -402,3 +402,20 @@ form.inline-form {
   font-size: 0.9rem;
   background: var(--cell-bg);
 }
+
+.flash-messages {
+  margin: 1em 0;
+}
+.alert {
+  padding: 1em;
+  border-radius: 8px;
+  margin-bottom: 1em;
+}
+.alert-success {
+  background-color: #d4edda;
+  color: #155724;
+}
+.alert-error {
+  background-color: #f8d7da;
+  color: #721c24;
+}

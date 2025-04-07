@@ -9,7 +9,7 @@ ENV TZ=$TIMEZONE
 
 # Install tzdata and optional tools
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends tzdata iputils-ping telnet && \
+    apt-get install -y --no-install-recommends tzdata iputils-ping telnet mariadb-client && \
     ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
     echo $TZ > /etc/timezone && \
     apt-get clean && \

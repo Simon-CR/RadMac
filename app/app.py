@@ -3,6 +3,7 @@ from views.index_views import index
 from views.user_views import user
 from views.group_views import group
 from views.stats_views import stats
+from views.maintenance_views import maintenance
 from config import app_config
 
 
@@ -26,6 +27,7 @@ app.register_blueprint(index)
 app.register_blueprint(user, url_prefix='/user')
 app.register_blueprint(group, url_prefix='/group')
 app.register_blueprint(stats, url_prefix='/stats')
+app.register_blueprint(maintenance, url_prefix='/maintenance')
 
 @app.route('/user_list')
 def legacy_user_list():
@@ -38,3 +40,7 @@ def legacy_group_list():
 @app.route('/')
 def index_redirect():
     return render_template('index.html')
+
+@app.route('/maintenance')
+def maintenance():
+    return redirect(url_for('maintenance.maintenance'))

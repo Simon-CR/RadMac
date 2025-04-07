@@ -1,11 +1,14 @@
 from flask import current_app, request, redirect, url_for, flash
-import mysql.connector
+from db_connection import get_connection
 from datetime import datetime, timedelta, timezone
+import mysql.connector
 import requests
 import time
 import os
+import subprocess
 import pytz
-from db_connection import get_connection # Assuming db_connection.py exists and defines get_connection
+import shutil
+
 
 # ------------------------------
 # User Management Functions
@@ -633,3 +636,93 @@ def get_summary_counts():
         conn.close()
 
     return total_users, total_groups
+
+# ------------------------------
+# Maintenance Functions
+# ------------------------------
+
+def clear_auth_logs():
+    """Route to clear authentication logs."""
+    from db_connection import get_connection
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM auth_logs")
+        conn.commit()
+        flash("✅ Authentication logs cleared.", "success")
+    except Exception as e:
+        conn.rollback()
+        flash(f"❌ Error clearing logs: {e}", "error")
+    finally:
+        cursor.close()
+        conn.close()
+    return redirect(url_for("maintenance.maintenance_page"))
+
+def backup_database():
+    """Create a SQL backup of the entire database and return the path to the file."""
+    conn = get_connection()
+    db_name = conn.database
+    user = conn.user
+    password = conn._password
+    host = conn.server_host if hasattr(conn, 'server_host') else 'localhost'
+    conn.close()
+
+    # Check if mysqldump exists
+    if not shutil.which("mysqldump"):
+        raise Exception("❌ 'mysqldump' command not found. Please install mariadb-client or mysql-client.")
+
+    backup_file = "backup.sql"
+
+    try:
+        with open(backup_file, "w") as f:
+            subprocess.run(
+                ["mysqldump", "-h", host, "-u", user, f"-p{password}", db_name],
+                stdout=f,
+                check=True
+            )
+    except subprocess.CalledProcessError as e:
+        raise Exception(f"❌ Backup failed: {e}")
+
+    return backup_file
+
+def restore_database(sql_content):
+    """Restore the database from raw SQL content (as string)."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        for statement in sql_content.split(';'):
+            stmt = statement.strip()
+            if stmt:
+                cursor.execute(stmt)
+        conn.commit()
+        flash("✅ Database restored successfully.", "success")
+    except Exception as e:
+        conn.rollback()
+        flash(f"❌ Error restoring database: {e}", "error")
+    finally:
+        cursor.close()
+        conn.close()
+    return redirect(url_for("maintenance.maintenance_page"))
+
+def get_table_stats():
+    """Return a dictionary of table names and their row counts."""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("SHOW TABLES")
+        tables = [row[0] for row in cursor.fetchall()]
+        stats = {}
+
+        for table in tables:
+            cursor.execute(f"SELECT COUNT(*) FROM `{table}`")
+            count = cursor.fetchone()[0]
+            stats[table] = count
+
+        return stats
+    except Exception as e:
+        print(f"❌ Error retrieving table stats: {e}")
+        return None
+    finally:
+        cursor.close()
+        conn.close()

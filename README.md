@@ -1,81 +1,82 @@
+FreeRADIUS Manager
+A lightweight web UI to manage MAC-based FreeRADIUS configurations, backed by a MySQL/MariaDB database and integrated with maclookup.app for vendor resolution.
 
-```markdown
-# FreeRADIUS Manager (Phase 1)
+✨ Features
+Manage MAC-based users (add/edit/delete)
 
-A lightweight web UI to manage MAC address-based FreeRADIUS configurations backed by a MariaDB/MySQL database.
+Assign users to VLANs via group mapping
 
-## Features
-- Add/edit/delete MAC-based users and VLAN assignments
-- View Access-Accept and Access-Reject logs
-- Lookup MAC vendors using maclookup.app API
-- Dynamically populate vendor cache to reduce API usage
+View Access-Accept, Access-Reject, and Fallback logs
 
----
+Filter logs by time range (e.g. last 5 min, last day)
 
-## Requirements (Phase 1)
-- Existing FreeRADIUS installation
-- Existing MariaDB or MySQL server with access credentials
+Vendor lookup for MAC addresses (with local caching)
 
-### Required Tables
-Add the following tables to your RADIUS database:
+Asynchronous background updates to reduce API hits
 
-```sql
-CREATE TABLE `rad_description` (
-  `id` int(11) unsigned NOT NULL AUTO_INCREMENT,
-  `username` char(12) DEFAULT NULL,
-  `description` varchar(200) DEFAULT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+Manual MAC vendor lookup with detailed results
 
-CREATE TABLE `mac_vendor_cache` (
-  `mac_prefix` varchar(6) NOT NULL,
-  `vendor_name` varchar(255) DEFAULT NULL,
-  `status` enum('found','not_found') DEFAULT 'found',
-  `last_checked` datetime DEFAULT current_timestamp(),
-  `last_updated` datetime DEFAULT current_timestamp(),
-  PRIMARY KEY (`mac_prefix`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-```
+Pagination for log history and user/group lists
 
----
+Dark/light theme toggle, scroll position memory, and toasts
 
-## Getting Started
+Admin actions to clean stale vendors and logs (planned)
 
-### 1. Clone this repo
-```bash
-git clone https://github.com/yourname/freeradius-manager.git
-cd freeradius-manager
-```
+🧱 Requirements
+Existing FreeRADIUS installation with a compatible schema
 
-### 2. Configure environment
-Create a `.env` file or configure environment variables:
+Existing MariaDB or MySQL server
 
-```env
-FLASK_SECRET_KEY=super-secret-key
-MYSQL_HOST=192.168.1.100
-MYSQL_USER=radiususer
-MYSQL_PASSWORD=yourpassword
-MYSQL_DATABASE=radius
-OUI_API_KEY= (leave empty for free tier)
-OUI_API_LIMIT_PER_SEC=2
-OUI_API_DAILY_LIMIT=10000
-```
+maclookup.app API key (optional, for vendor lookup)
 
-### 3. Run using Docker Compose
-```bash
-docker-compose up --build
-```
+🗃️ Required Tables
+Make sure your database includes the following tables:
 
----
+sql
+Copy
+Edit
+CREATE TABLE `users` (
+  `mac_address` VARCHAR(17) PRIMARY KEY,
+  `description` VARCHAR(255),
+  `vlan_id` INT
+);
 
-## Notes
-- The MAC vendor database will auto-populate as addresses are discovered
-- Only MAC-based users are supported in this release
+CREATE TABLE `groups` (
+  `vlan_id` INT PRIMARY KEY,
+  `description` VARCHAR(255)
+);
 
----
+CREATE TABLE `auth_logs` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `mac_address` VARCHAR(17),
+  `reply` ENUM('Access-Accept','Access-Reject','Access-Fallback'),
+  `result` TEXT,
+  `timestamp` DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 
-## Phase 2 Goals
-- Integrate FreeRADIUS server into Docker Compose
-- Optional MariaDB container
-- Provide self-contained stack for local or cloud deployment
-```
+CREATE TABLE `mac_vendors` (
+  `mac_prefix` VARCHAR(6) PRIMARY KEY,
+  `vendor_name` VARCHAR(255),
+  `status` ENUM('found', 'not_found') DEFAULT 'found',
+  `last_checked` DATETIME,
+  `last_updated` DATETIME
+);
+⚙️ Configuration
+Environment variables (via .env or Docker Compose):
+
+OUI_API_URL: MAC vendor API URL (default: https://api.maclookup.app/v2/macs/{})
+
+OUI_API_KEY: API key for maclookup.app
+
+OUI_API_LIMIT_PER_SEC: API rate limit per second (default: 2)
+
+OUI_API_DAILY_LIMIT: Max API calls per day (default: 10000)
+
+APP_TIMEZONE: Display timezone (e.g., America/Toronto)
+
+🚀 Usage
+Run with Docker Compose or your preferred WSGI stack
+
+Navigate to / for the dashboard
+
+Browse /users, /groups, and /stats for more details
