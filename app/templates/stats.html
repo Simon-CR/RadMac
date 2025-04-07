@@ -158,8 +158,17 @@
 </div>
 </div>
 
+<div class="auto-refresh-toggle">
+    <label>
+        <input type="checkbox" id="auto-refresh-checkbox">
+        Auto-refresh every 30s
+    </label>
+    <span id="refresh-status" style="margin-left: 1em; font-size: 0.9em; color: gray;"></span>
+</div>
+
 <script>
     document.addEventListener('DOMContentLoaded', () => {
+        // MAC vendor lookup
         const queriedPrefixes = new Set();
         document.querySelectorAll('.vendor-cell').forEach(cell => {
             const mac = cell.getAttribute('data-mac');
@@ -167,7 +176,7 @@
                 const prefix = mac.replace(/[^a-fA-F0-9]/g, '').substring(0, 6).toLowerCase();
                 if (queriedPrefixes.has(prefix)) return;
                 queriedPrefixes.add(prefix);
-    
+
                 fetch('{{ url_for("stats.lookup_mac_async") }}', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -188,6 +197,35 @@
                 });
             }
         });
+
+        // Auto-refresh toggle logic
+        const refreshCheckbox = document.getElementById('auto-refresh-checkbox');
+        const refreshStatus = document.getElementById('refresh-status');
+        let intervalId = null;
+
+        function startAutoRefresh() {
+            refreshStatus.textContent = "Auto-refresh enabled";
+            intervalId = setInterval(() => {
+                document.querySelector('form').submit();
+            }, 30000); // 30 seconds
+        }
+
+        function stopAutoRefresh() {
+            refreshStatus.textContent = "Auto-refresh disabled";
+            if (intervalId) clearInterval(intervalId);
+        }
+
+        refreshCheckbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        });
+
+        // Default: start disabled
+        stopAutoRefresh();
     });
 </script>
+
 {% endblock %}
