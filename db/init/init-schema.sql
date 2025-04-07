@@ -1,5 +1,5 @@
 -- init-schema.sql
-
+USE radius;
 -- Table for registered users (MAC-based auth)
 CREATE TABLE IF NOT EXISTS users (
     mac_address CHAR(12) NOT NULL PRIMARY KEY CHECK (mac_address REGEXP '^[0-9A-Fa-f]{12}$'),

@@ -3,6 +3,8 @@
 services:
   db:
     image: simonclr/radmac-db:latest
+    env_file:
+      - .env
     restart: unless-stopped
     ports:
       - "3306:3306"
