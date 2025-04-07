@@ -1,82 +1,49 @@
-FreeRADIUS Manager
-A lightweight web UI to manage MAC-based FreeRADIUS configurations, backed by a MySQL/MariaDB database and integrated with maclookup.app for vendor resolution.
+🛡️ RadMac — Web Manager and radius server for MAC-based authentication / VLAN Assignment
+RadMac is a lightweight Flask web UI for managing MAC address-based access control and VLAN assignment, backed by a MariaDB/MySQL database. It incorporate a lightweight radius server.
 
 ✨ Features
-Manage MAC-based users (add/edit/delete)
 
-Assign users to VLANs via group mapping
+🔐 MAC-based User Management
+Add/edit/delete MAC entries with descriptions and VLAN IDs.
 
-View Access-Accept, Access-Reject, and Fallback logs
+🧠 MAC Vendor Lookup
+Auto-lookup vendors using maclookup.app with rate-limited API integration and local caching.
 
-Filter logs by time range (e.g. last 5 min, last day)
+📊 Auth Log Viewer
+Filter Access-Accept / Reject / Fallback events with timestamps, MAC, vendor, and description.
 
-Vendor lookup for MAC addresses (with local caching)
+🧹 Database Maintenance Tools
+- View row counts for all tables
+- Clear auth logs
+- Backup the full database as a .sql file
+- Restore from uploaded .sql files
 
-Asynchronous background updates to reduce API hits
+🌗 Dark & Light Theme
+Toggle between light and dark modes, with theme persistence.
 
-Manual MAC vendor lookup with detailed results
+🔁 Session-Friendly UX
+Preserves scroll position, sticky headers, toast notifications.
 
-Pagination for log history and user/group lists
+📦 Setup (Docker Compose)
+The project includes a ready-to-use docker-compose.yml.
 
-Dark/light theme toggle, scroll position memory, and toasts
-
-Admin actions to clean stale vendors and logs (planned)
-
-🧱 Requirements
-Existing FreeRADIUS installation with a compatible schema
-
-Existing MariaDB or MySQL server
-
-maclookup.app API key (optional, for vendor lookup)
-
-🗃️ Required Tables
-Make sure your database includes the following tables:
-
-sql
+1. Clone the repository
+bash
 Copy
 Edit
-CREATE TABLE `users` (
-  `mac_address` VARCHAR(17) PRIMARY KEY,
-  `description` VARCHAR(255),
-  `vlan_id` INT
-);
+git clone https://github.com/Simon-CR/RadMac.git
+cd RadMac
 
-CREATE TABLE `groups` (
-  `vlan_id` INT PRIMARY KEY,
-  `description` VARCHAR(255)
-);
+2. Create environment file
+Copy .env.template to .env and edit:
 
-CREATE TABLE `auth_logs` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `mac_address` VARCHAR(17),
-  `reply` ENUM('Access-Accept','Access-Reject','Access-Fallback'),
-  `result` TEXT,
-  `timestamp` DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+- Fill in your MySQL credentials and other optional settings like OUI_API_KEY.
 
-CREATE TABLE `mac_vendors` (
-  `mac_prefix` VARCHAR(6) PRIMARY KEY,
-  `vendor_name` VARCHAR(255),
-  `status` ENUM('found', 'not_found') DEFAULT 'found',
-  `last_checked` DATETIME,
-  `last_updated` DATETIME
-);
-⚙️ Configuration
-Environment variables (via .env or Docker Compose):
+3. Run the stack
 
-OUI_API_URL: MAC vendor API URL (default: https://api.maclookup.app/v2/macs/{})
+docker-compose up --build
 
-OUI_API_KEY: API key for maclookup.app
+The web UI will be available at: http://localhost:8080
 
-OUI_API_LIMIT_PER_SEC: API rate limit per second (default: 2)
-
-OUI_API_DAILY_LIMIT: Max API calls per day (default: 10000)
-
-APP_TIMEZONE: Display timezone (e.g., America/Toronto)
-
-🚀 Usage
-Run with Docker Compose or your preferred WSGI stack
-
-Navigate to / for the dashboard
-
-Browse /users, /groups, and /stats for more details
+📄 License
+MIT — do whatever you want, no guarantees.
