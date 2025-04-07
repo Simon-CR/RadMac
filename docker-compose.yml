@@ -17,8 +17,7 @@ services:
   radius:
     image: simonclr/radmac-radius:latest
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     env_file:
       - .env
     ports:
@@ -36,8 +35,7 @@ services:
       - PYTHONPATH=/app
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
+      - db
   nginx:
     image: simonclr/radmac-nginx:latest
     ports:
