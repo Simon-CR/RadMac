@@ -4,6 +4,5 @@ __pycache__/
 *.log
 /app/logs/
 instance/
-.env.*
 .vscode/
 .DS_Store
