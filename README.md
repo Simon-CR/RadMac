@@ -1,7 +1,7 @@
 🛡️ RadMac — Web Manager and radius server for MAC-based authentication / VLAN Assignment
 RadMac is a lightweight Flask web UI for managing MAC address-based access control and VLAN assignment, backed by a MariaDB/MySQL database. It incorporate a lightweight radius server.
 
-✨ Features
+✨ Some Features
 
 🔐 MAC-based User Management
 Add/edit/delete MAC entries with descriptions and VLAN IDs.
