@@ -14,6 +14,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+      networks:
+        - webnet
   radius:
     image: simonclr/radmac-radius:latest
     depends_on:
@@ -23,10 +25,11 @@ services:
     ports:
       - "1812:1812/udp"
     restart: unless-stopped
+    networks:
+      - webnet
+
   app:
     image: simonclr/radmac-app:latest
-    volumes:
-      - ./app:/app  # Optional: remove if not needed for production
     env_file:
       - .env
     environment:
@@ -36,6 +39,9 @@ services:
     restart: unless-stopped
     depends_on:
       - db
+    networks:
+      - webnet
+
   nginx:
     image: simonclr/radmac-nginx:latest
     ports:
@@ -43,12 +49,20 @@ services:
     depends_on:
       - app
     restart: unless-stopped
+    networks:
+      - webnet
 
   adminer:
     image: adminer
     restart: unless-stopped
     ports:
       - "8081:8080"  
+    networks:
+      - webnet
 
 volumes:
   db_data:
+
+networks:
+  webnet:
+    driver: overlay
