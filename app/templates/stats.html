@@ -18,6 +18,14 @@
         <option value="last_30_days" {% if time_range == 'last_30_days' %}selected{% endif %}>Last 30 Days</option>
         <option value="all" {% if time_range == 'all' %}selected{% endif %}>All Time</option>
     </select>
+
+    <label for="per_page">Entries per page:</label>
+    <select name="per_page" id="per_page">
+        {% for option in [5,10, 25, 50, 100] %}
+        <option value="{{ option }}" {% if per_page == option %}selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+    </select>
+
     <button type="submit">Update</button>
 </form>
 
@@ -27,150 +35,188 @@
       Auto-refresh every 30s
     </label>
     <span id="refresh-status"></span>
-  </div>
+</div>
 
 <div class="stats-container">
 
-    <!-- Access-Accept Card -->
-    <div class="card success-card">
-        <h2>Recent Access-Accept</h2>
-        <table class="styled-table small-table">
-            <thead>
-                <tr>
-                    <th>MAC Address</th>
-                    <th>Description</th>
-                    <th>Vendor</th>
-                    <th>VLAN</th>
-                    <th>Time</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for entry in accept_entries %}
-                <tr>
-                    <td>{{ entry.mac_address }}</td>
-                    <td>{{ entry.description or '' }}</td>
-                    <td class="vendor-cell" data-mac="{{ entry.mac_address }}">{{ entry.vendor or '...' }}</td>
-                    <td>{{ entry.vlan_id or '?' }}</td>
-                    <td>{{ entry.ago }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% if total_pages_accept > 1 %}
-        <div class="pagination">
-            {% for page in range(1, total_pages_accept + 1) %}
-                {% if page == page_accept %}
-                    <span class="current-page">{{ page }}</span>
-                {% else %}
-                    <a href="{{ url_for('stats.stats_page', page_accept=page, page_reject=page_reject, page_fallback=page_fallback, time_range=time_range) }}">{{ page }}</a>
-                {% endif %}
+<!-- Access-Accept Card -->
+<div class="card success-card">
+    <h2>Recent Access-Accept</h2>
+    <table class="styled-table small-table">
+        <thead>
+            <tr>
+                <th>MAC Address</th>
+                <th>Description</th>
+                <th>Vendor</th>
+                <th>VLAN</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in accept_entries %}
+            <tr>
+                <td>{{ entry.mac_address }}</td>
+                <td>{{ entry.description or '' }}</td>
+                <td class="vendor-cell" data-mac="{{ entry.mac_address }}">{{ entry.vendor or '...' }}</td>
+                <td>{{ entry.vlan_id or '?' }}</td>
+                <td>{{ entry.ago }}</td>
+            </tr>
             {% endfor %}
-        </div>
+        </tbody>
+    </table>
+    {% if pagination_accept.pages|length > 1 %}
+    <div class="pagination">
+        {% if pagination_accept.show_first %}
+            <a href="{{ url_for('stats.stats_page', page_accept=pagination_accept.first_page, page_reject=page_reject, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">&laquo;</a>
         {% endif %}
-    </div>
+        {% if pagination_accept.show_prev %}
+            <a href="{{ url_for('stats.stats_page', page_accept=pagination_accept.prev_page, page_reject=page_reject, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">&lsaquo;</a>
+        {% endif %}
 
-    <!-- Access-Reject Card -->
-    <div class="card error-card">
-        <h2>Recent Access-Reject</h2>
-        <table class="styled-table small-table">
-            <thead>
-                <tr>
-                    <th>MAC Address</th>
-                    <th>Description</th>
-                    <th>Vendor</th>
-                    <th>Time</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for entry in reject_entries %}
-                <tr>
-                    <td>{{ entry.mac_address }}</td>
-                    <td>{{ entry.description or '' }}</td>
-                    <td class="vendor-cell" data-mac="{{ entry.mac_address }}">{{ entry.vendor or '...' }}</td>
-                    <td>{{ entry.ago }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% if total_pages_reject > 1 %}
-        <div class="pagination">
-            {% for page in range(1, total_pages_reject + 1) %}
-                {% if page == page_reject %}
-                    <span class="current-page">{{ page }}</span>
-                {% else %}
-                    <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=page, page_fallback=page_fallback, time_range=time_range) }}">{{ page }}</a>
-                {% endif %}
-            {% endfor %}
-        </div>
-        {% endif %}
-    </div>
+        {% for page in pagination_accept.pages %}
+            {% if page == page_accept %}
+                <span class="current-page">{{ page }}</span>
+            {% else %}
+                <a href="{{ url_for('stats.stats_page', page_accept=page, page_reject=page_reject, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">{{ page }}</a>
+            {% endif %}
+        {% endfor %}
 
-    <!-- Access-Fallback Card -->
-    <div class="card fallback-card">
-        <h2>Recent Access-Fallback</h2>
-        <table class="styled-table small-table">
-            <thead>
-                <tr>
-                    <th>MAC Address</th>
-                    <th>Description</th>
-                    <th>Vendor</th>
-                    <th>Time</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for entry in fallback_entries %}
-                <tr>
-                    <td>{{ entry.mac_address }}</td>
-                    <td>
-                        {% if not entry.already_exists %}
-                            <input type="text" name="description" value="{{ entry.description or '' }}" placeholder="Description (optional)" form="form-{{ loop.index }}">
-                        {% else %}
-                            {{ entry.description or '' }}
-                        {% endif %}
-                    </td>
-                    <td class="vendor-cell" data-mac="{{ entry.mac_address }}">{{ entry.vendor or '...' }}</td>
-                    <td>{{ entry.ago }}</td>
-                    <td>
-                        {% if not entry.already_exists %}
-                        <form method="POST" action="{{ url_for('stats.add') }}" class="inline-form" id="form-{{ loop.index }}">
-                            <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
-                            <select name="group_id" required>
-                                <option value="">Assign to VLAN</option>
-                                {% for group in available_groups %}
-                                <option value="{{ group.vlan_id }}">
-                                  VLAN {{ group.vlan_id }}{% if group.description %} - {{ group.description }}{% endif %}
-                                </option>
-                                {% endfor %}
-                              </select>
-                            <button type="submit" title="Add">💾</button>
-                        </form>
-                        {% else %}
-                        <span style="color: limegreen;">Already exists in VLAN {{ entry.existing_vlan or 'unknown' }}</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% if total_pages_fallback > 1 %}
-        <div class="pagination">
-            {% for page in range(1, total_pages_fallback + 1) %}
-                {% if page == page_fallback %}
-                    <span class="current-page">{{ page }}</span>
-                {% else %}
-                    <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=page_reject, page_fallback=page, time_range=time_range) }}">{{ page }}</a>
-                {% endif %}
-            {% endfor %}
-        </div>
+        {% if pagination_accept.show_next %}
+            <a href="{{ url_for('stats.stats_page', page_accept=pagination_accept.next_page, page_reject=page_reject, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">&rsaquo;</a>
+        {% endif %}
+        {% if pagination_accept.show_last %}
+            <a href="{{ url_for('stats.stats_page', page_accept=pagination_accept.last_page, page_reject=page_reject, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">&raquo;</a>
         {% endif %}
     </div>
+    {% endif %}
+</div>
+
+<!-- Access-Reject Card -->
+<div class="card error-card">
+    <h2>Recent Access-Reject</h2>
+    <table class="styled-table small-table">
+        <thead>
+            <tr>
+                <th>MAC Address</th>
+                <th>Description</th>
+                <th>Vendor</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in reject_entries %}
+            <tr>
+                <td>{{ entry.mac_address }}</td>
+                <td>{{ entry.description or '' }}</td>
+                <td class="vendor-cell" data-mac="{{ entry.mac_address }}">{{ entry.vendor or '...' }}</td>
+                <td>{{ entry.ago }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if pagination_reject.pages|length > 1 %}
+    <div class="pagination">
+        {% if pagination_reject.show_first %}
+            <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=pagination_reject.first_page, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">&laquo;</a>
+        {% endif %}
+        {% if pagination_reject.show_prev %}
+            <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=pagination_reject.prev_page, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">&lsaquo;</a>
+        {% endif %}
+        {% for page in pagination_reject.pages %}
+            {% if page == page_reject %}
+                <span class="current-page">{{ page }}</span>
+            {% else %}
+                <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=page, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">{{ page }}</a>
+            {% endif %}
+        {% endfor %}
+        {% if pagination_reject.show_next %}
+            <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=pagination_reject.next_page, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">&rsaquo;</a>
+        {% endif %}
+        {% if pagination_reject.show_last %}
+            <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=pagination_reject.last_page, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">&raquo;</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Access-Fallback Card -->
+<div class="card fallback-card">
+    <h2>Recent Access-Fallback</h2>
+    <table class="styled-table small-table">
+        <thead>
+            <tr>
+                <th>MAC Address</th>
+                <th>Description</th>
+                <th>Vendor</th>
+                <th>Time</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in fallback_entries %}
+            <tr>
+                <td>{{ entry.mac_address }}</td>
+                <td>
+                    {% if not entry.already_exists %}
+                        <input type="text" name="description" value="{{ entry.description or '' }}" placeholder="Description (optional)" form="form-{{ loop.index }}">
+                    {% else %}
+                        {{ entry.description or '' }}
+                    {% endif %}
+                </td>
+                <td class="vendor-cell" data-mac="{{ entry.mac_address }}">{{ entry.vendor or '...' }}</td>
+                <td>{{ entry.ago }}</td>
+                <td>
+                    {% if not entry.already_exists %}
+                    <form method="POST" action="{{ url_for('stats.add') }}" class="inline-form" id="form-{{ loop.index }}">
+                        <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
+                        <select name="group_id" required>
+                            <option value="">Assign to VLAN</option>
+                            {% for group in available_groups %}
+                            <option value="{{ group.vlan_id }}">
+                              VLAN {{ group.vlan_id }}{% if group.description %} - {{ group.description }}{% endif %}
+                            </option>
+                            {% endfor %}
+                          </select>
+                        <button type="submit" title="Add">💾</button>
+                    </form>
+                    {% else %}
+                    <span style="color: limegreen;">Already exists in VLAN {{ entry.existing_vlan or 'unknown' }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% if pagination_fallback.pages|length > 1 %}
+    <div class="pagination">
+        {% if pagination_fallback.show_first %}
+            <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=page_reject, page_fallback=pagination_fallback.first_page, per_page=per_page, time_range=time_range) }}">&laquo;</a>
+        {% endif %}
+        {% if pagination_fallback.show_prev %}
+            <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=page_reject, page_fallback=pagination_fallback.prev_page, per_page=per_page, time_range=time_range) }}">&lsaquo;</a>
+        {% endif %}
+        {% for page in pagination_fallback.pages %}
+            {% if page == page_fallback %}
+                <span class="current-page">{{ page }}</span>
+            {% else %}
+                <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=page_reject, page_fallback=page, per_page=per_page, time_range=time_range) }}">{{ page }}</a>
+            {% endif %}
+        {% endfor %}
+        {% if pagination_fallback.show_next %}
+            <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=page_reject, page_fallback=pagination_fallback.next_page, per_page=per_page, time_range=time_range) }}">&rsaquo;</a>
+        {% endif %}
+        {% if pagination_fallback.show_last %}
+            <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=page_reject, page_fallback=pagination_fallback.last_page, per_page=per_page, time_range=time_range) }}">&raquo;</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
 </div>
 </div>
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        // MAC vendor lookup
         const queriedPrefixes = new Set();
         document.querySelectorAll('.vendor-cell').forEach(cell => {
             const mac = cell.getAttribute('data-mac');
@@ -200,7 +246,6 @@
             }
         });
 
-        // Auto-refresh toggle logic
         const refreshCheckbox = document.getElementById('auto-refresh-checkbox');
         const refreshStatus = document.getElementById('refresh-status');
         let intervalId = null;
@@ -209,7 +254,7 @@
             refreshStatus.textContent = "Auto-refresh enabled";
             intervalId = setInterval(() => {
                 document.querySelector('form').submit();
-            }, 30000); // 30 seconds
+            }, 30000);
         }
 
         function stopAutoRefresh() {
@@ -225,7 +270,6 @@
             }
         });
 
-        // Default: start disabled
         stopAutoRefresh();
     });
 </script>
