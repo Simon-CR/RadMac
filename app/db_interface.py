@@ -520,7 +520,8 @@ def get_latest_auth_logs(reply_type=None, limit=5, time_range=None, offset=0):
         print(f"Warning: Unknown timezone '{tz_str}', falling back to UTC.")
         app_tz = pytz.utc
     now = datetime.now(app_tz)
-
+    print(f"🕒 Using timezone: {tz_str} → Now: {now.isoformat()}")
+    
     query_base = "SELECT * FROM auth_logs"
     filters = []
     params = []
@@ -548,6 +549,7 @@ def get_latest_auth_logs(reply_type=None, limit=5, time_range=None, offset=0):
 
         if delta:
             time_filter_dt = now - delta
+            print(f"🕒 Filtering logs after: {time_filter_dt.isoformat()}")
             filters.append("timestamp >= %s")
             params.append(time_filter_dt)
 
@@ -575,7 +577,8 @@ def count_auth_logs(reply_type=None, time_range=None):
         print(f"Warning: Unknown timezone '{tz_str}', falling back to UTC.")
         app_tz = pytz.utc
     now = datetime.now(app_tz)
-
+    print(f"🕒 Using timezone: {tz_str} → Now: {now.isoformat()}")
+    
     query_base = "SELECT COUNT(*) FROM auth_logs"
     filters = []
     params = []
@@ -603,6 +606,7 @@ def count_auth_logs(reply_type=None, time_range=None):
 
         if delta:
             time_filter_dt = now - delta
+            print(f"🕒 Filtering logs after: {time_filter_dt.isoformat()}")
             filters.append("timestamp >= %s")
             params.append(time_filter_dt)
 

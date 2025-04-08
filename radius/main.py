@@ -1,6 +1,7 @@
 from pyrad.server import Server, RemoteHost
 from pyrad.dictionary import Dictionary
 from pyrad.packet import AccessAccept, AccessReject
+from datetime import datetime, timezone
 import mysql.connector
 import os
 
@@ -22,6 +23,7 @@ class MacRadiusServer(Server):
     def HandleAuthPacket(self, pkt):
         username = pkt['User-Name'][0].upper()
         cursor = self.db.cursor(dictionary=True)
+        now_utc = datetime.now(timezone.utc)
         
         # Step 1: Check if the MAC exists in the users table
         cursor.execute("SELECT vlan_id FROM users WHERE mac_address = %s", (username,))
@@ -31,58 +33,46 @@ class MacRadiusServer(Server):
 
         # Step 2: Handle the Access-Accept or Access-Reject scenario
         if result:
-            # MAC found in users table
             vlan_id = result['vlan_id']
-
-            # Check if the VLAN is a denied VLAN
-            denied_vlan = os.getenv("DENIED_VLAN", "999")  # Get the denied VLAN from environment
+            denied_vlan = os.getenv("DENIED_VLAN", "999")
 
             if vlan_id == denied_vlan:
-                # Step 3: If the MAC is in a denied VLAN, reject the access
                 reply.code = AccessReject
                 cursor.execute("""
-                    INSERT INTO auth_logs (mac_address, reply, result)
-                    VALUES (%s, %s, %s)
-                """, (username, "Access-Reject", f"Denied due to VLAN {denied_vlan}"))
+                    INSERT INTO auth_logs (mac_address, reply, result, timestamp)
+                    VALUES (%s, %s, %s, %s)
+                """, (username, "Access-Reject", f"Denied due to VLAN {denied_vlan}", now_utc))
                 self.db.commit()
                 print(f"[INFO] MAC {username} rejected due to VLAN {denied_vlan}")
 
             else:
-                # Step 4: If the MAC is valid and not in the denied VLAN, accept access and assign VLAN
                 reply.code = AccessAccept
                 reply.AddAttribute("Tunnel-Type", 13)
                 reply.AddAttribute("Tunnel-Medium-Type", 6)
                 reply.AddAttribute("Tunnel-Private-Group-Id", vlan_id)
 
-                # Log successful access
                 cursor.execute("""
-                    INSERT INTO auth_logs (mac_address, reply, result)
-                    VALUES (%s, %s, %s)
-                """, (username, "Access-Accept", f"Assigned to VLAN {vlan_id}"))
+                    INSERT INTO auth_logs (mac_address, reply, result, timestamp)
+                    VALUES (%s, %s, %s, %s)
+                """, (username, "Access-Accept", f"Assigned to VLAN {vlan_id}", now_utc))
                 self.db.commit()
                 print(f"[INFO] MAC {username} accepted and assigned to VLAN {vlan_id}")
 
         else:
-            # Step 5: If the MAC is not found in the database, assign to fallback VLAN
-            reply.code = AccessAccept  # Still send Access-Accept even for fallback
-            reply["Tunnel-Type"] = 13  # VLAN
-            reply["Tunnel-Medium-Type"] = 6  # IEEE-802
+            reply.code = AccessAccept
+            reply["Tunnel-Type"] = 13
+            reply["Tunnel-Medium-Type"] = 6
             reply["Tunnel-Private-Group-Id"] = DEFAULT_VLAN_ID
 
-            # Log fallback assignment
             cursor.execute("""
-                INSERT INTO auth_logs (mac_address, reply, result)
-                VALUES (%s, %s, %s)
-            """, (username, "Access-Accept", f"Assigned to fallback VLAN {DEFAULT_VLAN_ID}"))
+                INSERT INTO auth_logs (mac_address, reply, result, timestamp)
+                VALUES (%s, %s, %s, %s)
+            """, (username, "Access-Accept", f"Assigned to fallback VLAN {DEFAULT_VLAN_ID}", now_utc))
             self.db.commit()
-
             print(f"[INFO] MAC {username} not found — assigned to fallback VLAN {DEFAULT_VLAN_ID}")
 
-        # Send the reply packet (whether accept or reject)
         self.SendReplyPacket(pkt.fd, reply)
         cursor.close()
-
-
 
 
 if __name__ == '__main__':
