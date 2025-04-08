@@ -3,275 +3,161 @@
 
 {% block content %}
 <div class="stats-page">
-<h1 class="page-title">Authentication Stats</h1>
+  <h1 class="page-title">Authentication Stats</h1>
 
-<form method="POST" action="{{ url_for('stats.stats_page') }}">
-    <label for="time_range">Select Time Range:</label>
-    <select name="time_range" id="time_range">
-        <option value="last_minute" {% if time_range == 'last_minute' %}selected{% endif %}>Last 1 Minute</option>
-        <option value="last_5_minutes" {% if time_range == 'last_5_minutes' %}selected{% endif %}>Last 5 Minutes</option>
-        <option value="last_10_minutes" {% if time_range == 'last_10_minutes' %}selected{% endif %}>Last 10 Minutes</option>
-        <option value="last_hour" {% if time_range == 'last_hour' %}selected{% endif %}>Last Hour</option>
-        <option value="last_6_hours" {% if time_range == 'last_6_hours' %}selected{% endif %}>Last 6 Hours</option>
-        <option value="last_12_hours" {% if time_range == 'last_12_hours' %}selected{% endif %}>Last 12 Hours</option>
-        <option value="last_day" {% if time_range == 'last_day' %}selected{% endif %}>Last Day</option>
-        <option value="last_30_days" {% if time_range == 'last_30_days' %}selected{% endif %}>Last 30 Days</option>
-        <option value="all" {% if time_range == 'all' %}selected{% endif %}>All Time</option>
-    </select>
-
-    <label for="per_page">Entries per page:</label>
-    <select name="per_page" id="per_page">
-        {% for option in [5,10, 25, 50, 100] %}
-        <option value="{{ option }}" {% if per_page == option %}selected{% endif %}>{{ option }}</option>
-        {% endfor %}
-    </select>
-
-    <button type="submit">Update</button>
-</form>
-
-<div class="auto-refresh-toggle">
-    <label>
-      <input type="checkbox" id="auto-refresh-checkbox">
-      Auto-refresh every 30s
-    </label>
-    <span id="refresh-status"></span>
-</div>
-
-<div class="stats-container">
-
-<!-- Access-Accept Card -->
-<div class="card success-card">
-    <h2>Recent Access-Accept</h2>
-    <table class="styled-table small-table">
-        <thead>
-            <tr>
-                <th>MAC Address</th>
-                <th>Description</th>
-                <th>Vendor</th>
-                <th>VLAN</th>
-                <th>Time</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for entry in accept_entries %}
-            <tr>
-                <td>{{ entry.mac_address }}</td>
-                <td>{{ entry.description or '' }}</td>
-                <td class="vendor-cell" data-mac="{{ entry.mac_address }}">{{ entry.vendor or '...' }}</td>
-                <td>{{ entry.vlan_id or '?' }}</td>
-                <td>{{ entry.ago }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% if pagination_accept.pages|length > 1 %}
-    <div class="pagination">
-        {% if pagination_accept.show_first %}
-            <a href="{{ url_for('stats.stats_page', page_accept=pagination_accept.first_page, page_reject=page_reject, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">&laquo;</a>
-        {% endif %}
-        {% if pagination_accept.show_prev %}
-            <a href="{{ url_for('stats.stats_page', page_accept=pagination_accept.prev_page, page_reject=page_reject, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">&lsaquo;</a>
-        {% endif %}
-
-        {% for page in pagination_accept.pages %}
-            {% if page == page_accept %}
-                <span class="current-page">{{ page }}</span>
-            {% else %}
-                <a href="{{ url_for('stats.stats_page', page_accept=page, page_reject=page_reject, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">{{ page }}</a>
-            {% endif %}
-        {% endfor %}
-
-        {% if pagination_accept.show_next %}
-            <a href="{{ url_for('stats.stats_page', page_accept=pagination_accept.next_page, page_reject=page_reject, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">&rsaquo;</a>
-        {% endif %}
-        {% if pagination_accept.show_last %}
-            <a href="{{ url_for('stats.stats_page', page_accept=pagination_accept.last_page, page_reject=page_reject, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">&raquo;</a>
-        {% endif %}
+  <div class="controls-card">
+    <div class="control-group">
+      <label for="time_range">Time Range:</label>
+      <select name="time_range" id="time_range">
+        <option value="last_minute">Last 1 Minute</option>
+        <option value="last_5_minutes">Last 5 Minutes</option>
+        <option value="last_10_minutes">Last 10 Minutes</option>
+        <option value="last_hour">Last Hour</option>
+        <option value="last_6_hours">Last 6 Hours</option>
+        <option value="last_12_hours">Last 12 Hours</option>
+        <option value="last_day">Last Day</option>
+        <option value="last_30_days">Last 30 Days</option>
+        <option value="all">All Time</option>
+      </select>
     </div>
-    {% endif %}
-</div>
-
-<!-- Access-Reject Card -->
-<div class="card error-card">
-    <h2>Recent Access-Reject</h2>
-    <table class="styled-table small-table">
-        <thead>
-            <tr>
-                <th>MAC Address</th>
-                <th>Description</th>
-                <th>Vendor</th>
-                <th>Time</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for entry in reject_entries %}
-            <tr>
-                <td>{{ entry.mac_address }}</td>
-                <td>{{ entry.description or '' }}</td>
-                <td class="vendor-cell" data-mac="{{ entry.mac_address }}">{{ entry.vendor or '...' }}</td>
-                <td>{{ entry.ago }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% if pagination_reject.pages|length > 1 %}
-    <div class="pagination">
-        {% if pagination_reject.show_first %}
-            <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=pagination_reject.first_page, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">&laquo;</a>
-        {% endif %}
-        {% if pagination_reject.show_prev %}
-            <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=pagination_reject.prev_page, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">&lsaquo;</a>
-        {% endif %}
-        {% for page in pagination_reject.pages %}
-            {% if page == page_reject %}
-                <span class="current-page">{{ page }}</span>
-            {% else %}
-                <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=page, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">{{ page }}</a>
-            {% endif %}
-        {% endfor %}
-        {% if pagination_reject.show_next %}
-            <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=pagination_reject.next_page, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">&rsaquo;</a>
-        {% endif %}
-        {% if pagination_reject.show_last %}
-            <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=pagination_reject.last_page, page_fallback=page_fallback, per_page=per_page, time_range=time_range) }}">&raquo;</a>
-        {% endif %}
+  
+    <div class="control-group">
+      <label for="per_page">Entries per page:</label>
+      <select name="per_page" id="per_page">
+        <option value="5">5</option>
+        <option value="10">10</option>
+        <option value="25">25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+      </select>
     </div>
-    {% endif %}
-</div>
-
-<!-- Access-Fallback Card -->
-<div class="card fallback-card">
-    <h2>Recent Access-Fallback</h2>
-    <table class="styled-table small-table">
-        <thead>
-            <tr>
-                <th>MAC Address</th>
-                <th>Description</th>
-                <th>Vendor</th>
-                <th>Time</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for entry in fallback_entries %}
-            <tr>
-                <td>{{ entry.mac_address }}</td>
-                <td>
-                    {% if not entry.already_exists %}
-                        <input type="text" name="description" value="{{ entry.description or '' }}" placeholder="Description (optional)" form="form-{{ loop.index }}">
-                    {% else %}
-                        {{ entry.description or '' }}
-                    {% endif %}
-                </td>
-                <td class="vendor-cell" data-mac="{{ entry.mac_address }}">{{ entry.vendor or '...' }}</td>
-                <td>{{ entry.ago }}</td>
-                <td>
-                    {% if not entry.already_exists %}
-                    <form method="POST" action="{{ url_for('stats.add') }}" class="inline-form" id="form-{{ loop.index }}">
-                        <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
-                        <select name="group_id" required>
-                            <option value="">Assign to VLAN</option>
-                            {% for group in available_groups %}
-                            <option value="{{ group.vlan_id }}">
-                              VLAN {{ group.vlan_id }}{% if group.description %} - {{ group.description }}{% endif %}
-                            </option>
-                            {% endfor %}
-                          </select>
-                        <button type="submit" title="Add">💾</button>
-                    </form>
-                    {% else %}
-                    <span style="color: limegreen;">Already exists in VLAN {{ entry.existing_vlan or 'unknown' }}</span>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% if pagination_fallback.pages|length > 1 %}
-    <div class="pagination">
-        {% if pagination_fallback.show_first %}
-            <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=page_reject, page_fallback=pagination_fallback.first_page, per_page=per_page, time_range=time_range) }}">&laquo;</a>
-        {% endif %}
-        {% if pagination_fallback.show_prev %}
-            <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=page_reject, page_fallback=pagination_fallback.prev_page, per_page=per_page, time_range=time_range) }}">&lsaquo;</a>
-        {% endif %}
-        {% for page in pagination_fallback.pages %}
-            {% if page == page_fallback %}
-                <span class="current-page">{{ page }}</span>
-            {% else %}
-                <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=page_reject, page_fallback=page, per_page=per_page, time_range=time_range) }}">{{ page }}</a>
-            {% endif %}
-        {% endfor %}
-        {% if pagination_fallback.show_next %}
-            <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=page_reject, page_fallback=pagination_fallback.next_page, per_page=per_page, time_range=time_range) }}">&rsaquo;</a>
-        {% endif %}
-        {% if pagination_fallback.show_last %}
-            <a href="{{ url_for('stats.stats_page', page_accept=page_accept, page_reject=page_reject, page_fallback=pagination_fallback.last_page, per_page=per_page, time_range=time_range) }}">&raquo;</a>
-        {% endif %}
+  
+    <div class="control-group auto-refresh-block">
+      <label>
+        <input type="checkbox" id="auto-refresh-checkbox"> Auto-refresh
+      </label>
+      <select id="refresh-interval">
+        <option value="15000">15s</option>
+        <option value="30000" selected>30s</option>
+        <option value="60000">1 min</option>
+        <option value="300000">5 min</option>
+      </select>
+      <span id="refresh-status"></span>
     </div>
-    {% endif %}
-</div>
+  
+    <div class="control-group search-block">
+      <input type="text" id="stats-search" placeholder="Search MAC, vendor, VLAN, description">
+    </div>
+  </div>
 
-</div>
+  <div id="stats-root" class="stats-container">
+    {% include '_stats_cards.html' %}
+  </div>
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const queriedPrefixes = new Set();
-        document.querySelectorAll('.vendor-cell').forEach(cell => {
-            const mac = cell.getAttribute('data-mac');
-            if (cell.textContent.trim() === '...') {
-                const prefix = mac.replace(/[^a-fA-F0-9]/g, '').substring(0, 6).toLowerCase();
-                if (queriedPrefixes.has(prefix)) return;
-                queriedPrefixes.add(prefix);
+document.addEventListener('DOMContentLoaded', () => {
+  const statsRoot = document.getElementById('stats-root');
+  const timeRangeSelect = document.getElementById('time_range');
+  const perPageSelect = document.getElementById('per_page');
+  const searchInput = document.getElementById('stats-search');
+  const refreshCheckbox = document.getElementById('auto-refresh-checkbox');
+  const refreshInterval = document.getElementById('refresh-interval');
+  const refreshStatus = document.getElementById('refresh-status');
 
-                fetch('{{ url_for("stats.lookup_mac_async") }}', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mac })
-                })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.vendor) {
-                        document.querySelectorAll(`.vendor-cell[data-mac^="${prefix}"]`).forEach(c => {
-                            if (c.textContent.trim() === '...') {
-                                c.textContent = data.vendor;
-                            }
-                        });
-                    }
-                })
-                .catch(err => {
-                    console.warn('MAC lookup failed:', err);
-                });
-            }
-        });
+  let intervalId = null;
+  let currentPageAccept = 1;
+  let currentPageReject = 1;
+  let currentPageFallback = 1;
 
-        const refreshCheckbox = document.getElementById('auto-refresh-checkbox');
-        const refreshStatus = document.getElementById('refresh-status');
-        let intervalId = null;
+  function setInitialSelectValuesFromURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const time = urlParams.get('time_range');
+    const page = urlParams.get('per_page');
+    if (time) timeRangeSelect.value = time;
+    if (page) perPageSelect.value = page;
+  }
 
-        function startAutoRefresh() {
-            refreshStatus.textContent = "Auto-refresh enabled";
-            intervalId = setInterval(() => {
-                document.querySelector('form').submit();
-            }, 30000);
-        }
+  async function fetchStatsData() {
+    try {
+      const timeRange = timeRangeSelect.value;
+      const perPage = perPageSelect.value;
+      const params = new URLSearchParams({
+        time_range: timeRange,
+        per_page: perPage,
+        page_accept: currentPageAccept,
+        page_reject: currentPageReject,
+        page_fallback: currentPageFallback
+      });
 
-        function stopAutoRefresh() {
-            refreshStatus.textContent = "Auto-refresh disabled";
-            if (intervalId) clearInterval(intervalId);
-        }
+      const response = await fetch(`/stats/fetch_stats_data?${params}`);
+      const html = await response.text();
+      statsRoot.innerHTML = html;
+      filterRows();
+      attachPaginationHandlers();
+    } catch (err) {
+      console.error('Error fetching stats data:', err);
+      refreshStatus.textContent = 'Error loading stats data.';
+    }
+  }
 
-        refreshCheckbox.addEventListener('change', (e) => {
-            if (e.target.checked) {
-                startAutoRefresh();
-            } else {
-                stopAutoRefresh();
-            }
-        });
+  function startAutoRefresh() {
+    refreshStatus.textContent = `Refreshing every ${refreshInterval.selectedOptions[0].text}`;
+    if (intervalId) clearInterval(intervalId);
+    intervalId = setInterval(fetchStatsData, parseInt(refreshInterval.value));
+  }
 
-        stopAutoRefresh();
+  function stopAutoRefresh() {
+    refreshStatus.textContent = "Auto-refresh disabled";
+    if (intervalId) clearInterval(intervalId);
+  }
+
+  function filterRows() {
+    const query = searchInput.value.toLowerCase();
+    document.querySelectorAll('.styled-table tbody tr').forEach(row => {
+      row.style.display = row.textContent.toLowerCase().includes(query) ? '' : 'none';
     });
-</script>
+  }
 
+  function attachPaginationHandlers() {
+    document.querySelectorAll('.pagination').forEach(pagination => {
+      const type = pagination.getAttribute('data-type');
+      pagination.querySelectorAll('a[data-page]').forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const page = parseInt(link.getAttribute('data-page'));
+          if (type === 'accept') currentPageAccept = page;
+          else if (type === 'reject') currentPageReject = page;
+          else if (type === 'fallback') currentPageFallback = page;
+          fetchStatsData();
+        });
+      });
+    });
+  }
+
+  // Initial setup
+  setInitialSelectValuesFromURL();
+  fetchStatsData();
+
+  timeRangeSelect.addEventListener('change', () => {
+    currentPageAccept = currentPageReject = currentPageFallback = 1;
+    fetchStatsData();
+  });
+
+  perPageSelect.addEventListener('change', () => {
+    currentPageAccept = currentPageReject = currentPageFallback = 1;
+    fetchStatsData();
+  });
+
+  refreshCheckbox.addEventListener('change', () => {
+    refreshCheckbox.checked ? startAutoRefresh() : stopAutoRefresh();
+  });
+
+  refreshInterval.addEventListener('change', () => {
+    if (refreshCheckbox.checked) startAutoRefresh();
+  });
+
+  searchInput.addEventListener('input', filterRows);
+});
+</script>
 {% endblock %}

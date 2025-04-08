@@ -1,0 +1,170 @@
+{# Partial for rendering all three stats cards with AJAX-aware pagination #}
+
+<div class="card success-card">
+    <h2>Recent Access-Accept</h2>
+    <table class="styled-table small-table">
+      <thead>
+        <tr>
+          <th>MAC Address</th>
+          <th>Description</th>
+          <th>Vendor</th>
+          <th>VLAN</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in accept_entries %}
+        <tr>
+          <td>{{ entry.mac_address }}</td>
+          <td>{{ entry.description or '' }}</td>
+          <td class="vendor-cell" data-mac="{{ entry.mac_address }}">{{ entry.vendor or '...' }}</td>
+          <td>{{ entry.vlan_id or '?' }}</td>
+          <td>{{ entry.ago }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if pagination_accept.pages|length > 1 %}
+    <div class="pagination" data-type="accept">
+      {% if pagination_accept.show_first %}
+        <a href="#" data-page="1">1</a>
+      {% endif %}
+      {% if pagination_accept.show_prev %}
+        <a href="#" data-page="{{ pagination_accept.prev_page }}">‹</a>
+      {% endif %}
+      {% for page in pagination_accept.pages %}
+        {% if page == page_accept %}
+          <span class="current-page">{{ page }}</span>
+        {% else %}
+          <a href="#" data-page="{{ page }}">{{ page }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if pagination_accept.show_next %}
+        <a href="#" data-page="{{ pagination_accept.next_page }}">›</a>
+      {% endif %}
+      {% if pagination_accept.show_last %}
+        <a href="#" data-page="{{ pagination_accept.last_page }}">{{ pagination_accept.last_page }}</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  
+  <div class="card error-card">
+    <h2>Recent Access-Reject</h2>
+    <table class="styled-table small-table">
+      <thead>
+        <tr>
+          <th>MAC Address</th>
+          <th>Description</th>
+          <th>Vendor</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in reject_entries %}
+        <tr>
+          <td>{{ entry.mac_address }}</td>
+          <td>{{ entry.description or '' }}</td>
+          <td class="vendor-cell" data-mac="{{ entry.mac_address }}">{{ entry.vendor or '...' }}</td>
+          <td>{{ entry.ago }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if pagination_reject.pages|length > 1 %}
+    <div class="pagination" data-type="reject">
+      {% if pagination_reject.show_first %}
+        <a href="#" data-page="1">1</a>
+      {% endif %}
+      {% if pagination_reject.show_prev %}
+        <a href="#" data-page="{{ pagination_reject.prev_page }}">‹</a>
+      {% endif %}
+      {% for page in pagination_reject.pages %}
+        {% if page == page_reject %}
+          <span class="current-page">{{ page }}</span>
+        {% else %}
+          <a href="#" data-page="{{ page }}">{{ page }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if pagination_reject.show_next %}
+        <a href="#" data-page="{{ pagination_reject.next_page }}">›</a>
+      {% endif %}
+      {% if pagination_reject.show_last %}
+        <a href="#" data-page="{{ pagination_reject.last_page }}">{{ pagination_reject.last_page }}</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  
+  <div class="card fallback-card">
+    <h2>Recent Access-Fallback</h2>
+    <table class="styled-table small-table">
+      <thead>
+        <tr>
+          <th>MAC Address</th>
+          <th>Description</th>
+          <th>Vendor</th>
+          <th>Time</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in fallback_entries %}
+        <tr>
+          <td>{{ entry.mac_address }}</td>
+          <td>
+            {% if not entry.already_exists %}
+              <input type="text" name="description" value="{{ entry.description or '' }}" placeholder="Description (optional)" form="form-{{ loop.index }}">
+            {% else %}
+              {{ entry.description or '' }}
+            {% endif %}
+          </td>
+          <td class="vendor-cell" data-mac="{{ entry.mac_address }}">{{ entry.vendor or '...' }}</td>
+          <td>{{ entry.ago }}</td>
+          <td>
+            {% if not entry.already_exists %}
+            <form method="POST" action="{{ url_for('stats.add') }}" class="inline-form" id="form-{{ loop.index }}">
+              <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
+              <select name="group_id" required>
+                <option value="">Assign to VLAN</option>
+                {% for group in available_groups %}
+                <option value="{{ group.vlan_id }}">
+                  VLAN {{ group.vlan_id }}{% if group.description %} - {{ group.description }}{% endif %}
+                </option>
+                {% endfor %}
+              </select>
+              <button type="submit" title="Add">💾</button>
+            </form>
+            {% else %}
+            <span style="color: limegreen;">Already exists in VLAN {{ entry.existing_vlan or 'unknown' }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if pagination_fallback.pages|length > 1 %}
+    <div class="pagination" data-type="fallback">
+      {% if pagination_fallback.show_first %}
+        <a href="#" data-page="1">1</a>
+      {% endif %}
+      {% if pagination_fallback.show_prev %}
+        <a href="#" data-page="{{ pagination_fallback.prev_page }}">‹</a>
+      {% endif %}
+      {% for page in pagination_fallback.pages %}
+        {% if page == page_fallback %}
+          <span class="current-page">{{ page }}</span>
+        {% else %}
+          <a href="#" data-page="{{ page }}">{{ page }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if pagination_fallback.show_next %}
+        <a href="#" data-page="{{ pagination_fallback.next_page }}">›</a>
+      {% endif %}
+      {% if pagination_fallback.show_last %}
+        <a href="#" data-page="{{ pagination_fallback.last_page }}">{{ pagination_fallback.last_page }}</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  
