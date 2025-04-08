@@ -21,6 +21,14 @@
     <button type="submit">Update</button>
 </form>
 
+<div class="auto-refresh-toggle">
+    <label>
+      <input type="checkbox" id="auto-refresh-checkbox">
+      Auto-refresh every 30s
+    </label>
+    <span id="refresh-status"></span>
+  </div>
+
 <div class="stats-container">
 
     <!-- Access-Accept Card -->
@@ -32,6 +40,7 @@
                     <th>MAC Address</th>
                     <th>Description</th>
                     <th>Vendor</th>
+                    <th>VLAN</th>
                     <th>Time</th>
                 </tr>
             </thead>
@@ -41,6 +50,7 @@
                     <td>{{ entry.mac_address }}</td>
                     <td>{{ entry.description or '' }}</td>
                     <td class="vendor-cell" data-mac="{{ entry.mac_address }}">{{ entry.vendor or '...' }}</td>
+                    <td>{{ entry.vlan_id or '?' }}</td>
                     <td>{{ entry.ago }}</td>
                 </tr>
                 {% endfor %}
@@ -156,14 +166,6 @@
         {% endif %}
     </div>
 </div>
-</div>
-
-<div class="auto-refresh-toggle">
-    <label>
-        <input type="checkbox" id="auto-refresh-checkbox">
-        Auto-refresh every 30s
-    </label>
-    <span id="refresh-status" style="margin-left: 1em; font-size: 0.9em; color: gray;"></span>
 </div>
 
 <script>

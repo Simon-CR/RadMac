@@ -29,7 +29,7 @@ services:
       - .env
     ports:
       - "1812:1812/udp"
-    restart: unless-stopped
+    restart: always
     networks:
       - webnet
 
@@ -70,4 +70,4 @@ volumes:
 
 networks:
   webnet:
-    driver: overlay
+    name: webnet

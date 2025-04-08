@@ -419,3 +419,35 @@ form.inline-form {
   background-color: #f8d7da;
   color: #721c24;
 }
+
+.auto-refresh-toggle {
+  margin-top: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 0.5rem 1rem;
+  background-color: var(--card-bg);
+  border: 1px solid #666;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: var(--fg);
+}
+
+.auto-refresh-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.auto-refresh-toggle input[type="checkbox"] {
+  transform: scale(1.2);
+  accent-color: var(--accent);
+}
+
+.auto-refresh-toggle #refresh-status {
+  font-style: italic;
+  opacity: 0.8;
+}
