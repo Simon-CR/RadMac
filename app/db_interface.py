@@ -525,7 +525,11 @@ def get_latest_auth_logs(reply_type=None, limit=5, time_range=None, offset=0):
     filters = []
     params = []
 
-    if reply_type is not None:
+    if reply_type == 'Accept-Fallback':
+        filters.append("reply = 'Access-Accept'")
+        filters.append("result LIKE %s")
+        params.append('%Fallback%')
+    elif reply_type is not None:
         filters.append("reply = %s")
         params.append(reply_type)
 
@@ -576,7 +580,11 @@ def count_auth_logs(reply_type=None, time_range=None):
     filters = []
     params = []
 
-    if reply_type is not None:
+    if reply_type == 'Accept-Fallback':
+        filters.append("reply = 'Access-Accept'")
+        filters.append("result LIKE %s")
+        params.append('%Fallback%')
+    elif reply_type is not None:
         filters.append("reply = %s")
         params.append(reply_type)
 
