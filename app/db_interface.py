@@ -637,6 +637,33 @@ def get_summary_counts():
 
     return total_users, total_groups
 
+def get_database_stats():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    stats = {}
+
+    # Get total size of the database
+    cursor.execute("""
+        SELECT table_schema AS db_name,
+               ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) AS total_mb
+        FROM information_schema.tables
+        WHERE table_schema = DATABASE()
+        GROUP BY table_schema
+    """)
+    row = cursor.fetchone()
+    stats["total_size_mb"] = row[1] if row else 0
+
+    # Optional: count total rows in key tables
+    cursor.execute("SELECT COUNT(*) FROM auth_logs")
+    stats["auth_logs_count"] = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(*) FROM users")
+    stats["users_count"] = cursor.fetchone()[0]
+
+    conn.close()
+    return stats
+
 # ------------------------------
 # Maintenance Functions
 # ------------------------------
@@ -726,3 +753,5 @@ def get_table_stats():
     finally:
         cursor.close()
         conn.close()
+        
+

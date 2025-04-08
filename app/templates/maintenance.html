@@ -1,67 +1,93 @@
 {% extends 'base.html' %}
 {% block title %}Maintenance{% endblock %}
 {% block content %}
-    <h1>Database Maintenance</h1>
+<div class="maintenance-page">
+  <h1>Database Maintenance</h1>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div class="flash-messages">
-            {% for category, message in messages %}
-            <div class="alert alert-{{ category }}">{{ message }}</div>
-            {% endfor %}
-        </div>
-        {% endif %}
-    {% endwith %}
-    
-    <p>Perform common database maintenance tasks here.</p>
-
-    <hr>
-
-    <h2>Database Statistics</h2>
-    <div class="database-stats">
-        {% if table_stats %}
-            {% for table, row_count in table_stats.items() %}
-                <div class="card">
-                    <div class="card-header">{{ table }}</div>
-                    <div class="card-body">
-                        <p>Number of rows: {{ row_count }}</p>
-                    </div>
-                </div>
-            {% endfor %}
-        {% else %}
-            <p>Could not retrieve database statistics.</p>
-        {% endif %}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-messages">
+      {% for category, message in messages %}
+      <div class="alert alert-{{ category }}">{{ message }}</div>
+      {% endfor %}
     </div>
+    {% endif %}
+  {% endwith %}
 
-    <hr>
+  <div class="section">
+    <div class="card neutral">
+      <div class="card-header">Database Overview</div>
+      <div class="card-body">
+        <table class="styled-table">
+          <tbody>
+            <tr>
+              <th>Database Size</th>
+              <td>{{ db_stats.total_size_mb }} MB</td>
+            </tr>
+            <tr>
+              <th>auth_logs Rows</th>
+              <td>{{ db_stats.auth_logs_count }}</td>
+            </tr>
+            <tr>
+              <th>users Rows</th>
+              <td>{{ db_stats.users_count }}</td>
+            </tr>
+            {% if table_stats %}
+              {% for table, row_count in table_stats.items() %}
+              {% if table != 'auth_logs' and table != 'users' %}
+              <tr>
+                <th>{{ table }} Rows</th>
+                <td>{{ row_count }}</td>
+              </tr>
+              {% endif %}
+              {% endfor %}
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
-    <h2>Clear Authentication Logs</h2>
-    <p>Permanently remove all authentication logs from the database.  This action cannot be undone.</p>
-    <form action="/maintenance/clear_auth_logs" method="post">
-        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to clear all authentication logs? This action is irreversible!')">
+  <div class="section">
+    <div class="card">
+      <div class="card-header">Clear auth_logs Table</div>
+      <div class="card-body">
+        <p>Permanently remove all rows from the <code>auth_logs</code> table. This action cannot be undone.</p>
+        <form action="/maintenance/clear_auth_logs" method="post">
+          <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to clear all authentication logs? This action is irreversible!')">
             Clear Logs
-        </button>
-    </form>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
 
-    <hr>
+  <div class="section">
+    <div class="card">
+      <div class="card-header">Backup Database</div>
+      <div class="card-body">
+        <p>Dump the current SQL database to a downloadable file.</p>
+        <p class="alert-error" style="margin: 1rem 0;">Warning: Backup size can be large if <code>auth_logs</code> has not been cleared.</p>
+        <form action="/maintenance/backup_database" method="get">
+          <button type="submit" class="btn">Backup Database</button>
+        </form>
+      </div>
+    </div>
+  </div>
 
-    <h2>Database Backup</h2>
-    <p>Create a backup of the current database. The backup will be saved as a SQL file.</p>
-    <p style="color: red;">
-        Warning: Database backups can be very large if you do not clear the authentication logs first.
-    </p>
-    <form action="/maintenance/backup_database" method="get">
-        <button type="submit" class="btn btn-primary">Backup Database</button>
-    </form>
-
-    <hr>
-
-    <h2>Database Restore</h2>
-    <p>Restore the database from a previously created SQL backup file.  This will overwrite the current database.</p>
-    <form action="/maintenance/restore_database" method="post" enctype="multipart/form-data">
-        <input type="file" name="file" accept=".sql" required>
-        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to restore the database from this file?  This will OVERWRITE the current database.')">
+  <div class="section">
+    <div class="card">
+      <div class="card-header">Restore Database</div>
+      <div class="card-body">
+        <p>Restore the SQL database from a previously exported file. This will overwrite all current data.</p>
+        <form action="/maintenance/restore_database" method="post" enctype="multipart/form-data">
+          <input type="file" name="file" accept=".sql" required>
+          <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to restore the database from this file? This will OVERWRITE the current database.')">
             Restore Database
-        </button>
-    </form>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

@@ -1,16 +1,17 @@
 from flask import Blueprint, render_template, request, send_file
 import mysql.connector
 import os
-from db_interface import clear_auth_logs, backup_database, restore_database, get_table_stats # Import the functions from db_interface.py
+from db_interface import get_database_stats, clear_auth_logs, backup_database, restore_database, get_table_stats # Import the functions from db_interface.py
 
 
 maintenance = Blueprint('maintenance', __name__, url_prefix='/maintenance')
 
 @maintenance.route('/')
 def maintenance_page():
-    """Renders the maintenance page."""
+    """Renders the maintenance page with table and DB stats."""
     table_stats = get_table_stats()
-    return render_template('maintenance.html', table_stats=table_stats)
+    db_stats = get_database_stats()
+    return render_template('maintenance.html', table_stats=table_stats, db_stats=db_stats)
 
 @maintenance.route('/clear_auth_logs', methods=['POST'])
 def clear_auth_logs_route():
