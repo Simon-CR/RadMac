@@ -80,51 +80,6 @@ def update_user(mac_address, description, vlan_id):
     cursor.close()
     conn.close()
 
-
-# def update_user_description(mac_address, description):
-#     """Update the description field of a user identified by MAC address."""
-#     conn = get_connection()
-#     cursor = conn.cursor()
-#     cursor.execute("UPDATE users SET description = %s WHERE mac_address = %s", (description, mac_address.lower()))
-#     conn.commit()
-#     cursor.close()
-#     conn.close()
-
-# Note: This function seems redundant with update_user_description. Included as per instructions.
-# def update_description(mac_address, description):
-#     """Update the description for a given MAC address in the users table."""
-#     conn = get_connection()
-#     cursor = conn.cursor()
-#     cursor.execute(
-#         "UPDATE users SET description = %s WHERE mac_address = %s",
-#         (description, mac_address.lower())
-#     )
-#     conn.commit()
-#     cursor.close()
-#     conn.close()
-
-# def update_user_vlan(mac_address, vlan_id):
-#     """Update the VLAN ID for a given MAC address in the users table."""
-#     conn = get_connection()
-#     cursor = conn.cursor()
-#     cursor.execute("UPDATE users SET vlan_id = %s WHERE mac_address = %s", (vlan_id, mac_address.lower()))
-#     conn.commit()
-#     cursor.close()
-#     conn.close()
-
-# # Note: This function seems redundant with update_user_vlan. Included as per instructions.
-# def update_vlan(mac_address, vlan_id):
-#     """Update the VLAN ID for a given MAC address in the users table."""
-#     conn = get_connection()
-#     cursor = conn.cursor()
-#     cursor.execute(
-#         "UPDATE users SET vlan_id = %s WHERE mac_address = %s",
-#         (vlan_id, mac_address.lower())
-#     )
-#     conn.commit()
-#     cursor.close()
-#     conn.close()
-
 def delete_user(mac_address):
     """Remove a user from the database by their MAC address."""
     conn = get_connection()

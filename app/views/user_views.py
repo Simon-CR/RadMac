@@ -35,22 +35,6 @@ def update_user_route():
     update_user(mac, desc, vlan_id)
     return redirect(url_for('user.user_list'))
 
-# @user.route('/update_description', methods=['POST'])
-# def update_description_route():
-#     mac = request.form['mac_address']
-#     desc = request.form.get('description', '')
-#     update_description(mac, desc)
-#     return redirect(url_for('user.user_list'))
-
-
-# @user.route('/update_vlan', methods=['POST'])
-# def update_vlan_route():
-#     mac = request.form['mac_address']
-#     group_id = request.form['group_id']
-#     update_vlan(mac, group_id)
-#     return redirect(url_for('user.user_list'))
-
-
 @user.route('/delete', methods=['POST'])
 def delete():
     mac = request.form['mac_address']
