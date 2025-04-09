@@ -34,7 +34,7 @@ services:
       - webnet
 
   app:
-    image: simonclr/radmac-app:dev
+    image: simonclr/radmac-app:latest
     env_file:
       - .env
     environment:
