@@ -6,3 +6,5 @@ __pycache__/
 instance/
 .vscode/
 .DS_Store
+docker-compose.yml
+

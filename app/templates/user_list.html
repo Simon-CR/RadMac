@@ -31,31 +31,28 @@
     <tr>
       <td>{{ entry.mac_address }}</td>
 
-      <!-- Form spans Description and Actions columns -->
-      <form method="POST" action="{{ url_for('user.update_description_route') }}">
+      <form method="POST" action="{{ url_for('user.update_user_route') }}">
+        <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
+
         <td>
-          <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
           <input type="text" name="description" value="{{ entry.description or '' }}">
         </td>
 
         <td>{{ entry.vendor or "..." }}</td>
 
         <td>
-          <form method="POST" action="{{ url_for('user.update_vlan_route') }}" class="inline-form">
-            <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">
-            <select name="group_id" onchange="this.form.submit()">
-              {% for group in available_groups %}
-              <option value="{{ group.vlan_id }}" {% if group.vlan_id == entry.vlan_id %}selected{% endif %}>
-                VLAN {{ group.vlan_id }}{% if group.description %} - {{ group.description }}{% endif %}
-              </option>
-              {% endfor %}
-            </select>
-          </form>
+          <select name="group_id">
+            {% for group in available_groups %}
+            <option value="{{ group.vlan_id }}" {% if group.vlan_id == entry.vlan_id %}selected{% endif %}>
+              VLAN {{ group.vlan_id }}{% if group.description %} - {{ group.description }}{% endif %}
+            </option>
+            {% endfor %}
+          </select>
         </td>
 
         <td>
           <button type="submit" title="Save">💾</button>
-      </form> <!-- Closing the description form here -->
+      </form>
 
           <form method="POST" action="{{ url_for('user.delete') }}" style="display:inline;">
             <input type="hidden" name="mac_address" value="{{ entry.mac_address }}">

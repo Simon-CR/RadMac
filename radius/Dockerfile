@@ -18,5 +18,7 @@ COPY . .
 # Expose RADIUS port (UDP)
 EXPOSE 1812/udp
 
+COPY wait-for-db.py .
+
 # Run the RADIUS service
-CMD ["python", "main.py"]
+CMD ["sh", "-c", "python wait-for-db.py && python main.py"]
