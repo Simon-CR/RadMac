@@ -22,20 +22,17 @@
   <tbody>
     {% for group in available_groups %}
     <tr>
-      <td>{{ group.vlan_id }}</td>
-      <td>
-        <form method="POST" action="{{ url_for('group.update_description_route') }}" class="preserve-scroll">
-          <input type="hidden" name="group_id" value="{{ group.vlan_id }}">
+      <form method="POST" action="{{ url_for('group.update_description_route') }}" class="preserve-scroll">
+        <input type="hidden" name="group_id" value="{{ group.vlan_id }}">
+        <td>{{ group.vlan_id }}</td>
+        <td>
           <input type="text" name="description" value="{{ group.description or '' }}" class="description-input">
-        </form>
-      </td>
-      <td>{{ group.user_count }}</td>
-      <td>
-        <form method="POST" action="{{ url_for('group.update_description_route') }}" class="preserve-scroll" style="display:inline;">
-          <input type="hidden" name="group_id" value="{{ group.vlan_id }}">
-          <input type="hidden" name="description" value="{{ group.description }}">
+        </td>
+        <td>{{ group.user_count }}</td>
+        <td>
           <button type="submit" title="Save">💾</button>
-        </form>
+      </form>
+
         <form method="POST" action="{{ url_for('group.delete_group_route_handler') }}" class="preserve-scroll delete-group-form" data-user-count="{{ group.user_count }}" style="display:inline;">
           <input type="hidden" name="group_id" value="{{ group.vlan_id }}">
           <button type="submit">❌</button>

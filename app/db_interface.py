@@ -119,22 +119,6 @@ def add_group(vlan_id, description):
     cursor.close()
     conn.close()
 
-def duplicate_group(vlan_id):
-    """Create a duplicate of a group with an incremented VLAN ID."""
-    conn = get_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT vlan_id, description FROM groups WHERE vlan_id = %s", (vlan_id,))
-    group = cursor.fetchone()
-
-    if group:
-        new_vlan_id = int(group['vlan_id']) + 1  # Auto-increment logic
-        new_description = f"{group['description']} Copy" if group['description'] else None
-        cursor.execute("INSERT INTO groups (vlan_id, description) VALUES (%s, %s)", (new_vlan_id, new_description))
-        conn.commit()
-
-    cursor.close()
-    conn.close()
-
 def update_group_description(vlan_id, description):
     """Update the description for a given MAC address in the users table."""
     # Docstring seems incorrect (mentions MAC address), but keeping original text.
