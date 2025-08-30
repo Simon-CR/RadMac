@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block title %}Login - RadMac{% endblock %}
+{% block content %}
+<div class="auth-container">
+  <h2>Login</h2>
+  <form method="post">
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" required autofocus>
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" required>
+    <button type="submit">Login</button>
+  </form>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+</div>
+{% endblock %}

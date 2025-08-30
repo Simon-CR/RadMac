@@ -16,6 +16,12 @@
       <a href="{{ url_for('maintenance.maintenance_page') }}">Maintenance</a>
     </div>
     <div class="right">
+      {% if current_user.is_authenticated %}
+        <a href="{{ url_for('user_menu') }}">User Menu</a>
+        <a href="{{ url_for('logout') }}">Logout</a>
+      {% else %}
+        <a href="{{ url_for('login') }}">Login</a>
+      {% endif %}
       <button id="theme-toggle">🌓 Theme</button>
     </div>
   </nav>

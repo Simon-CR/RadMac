@@ -25,8 +25,15 @@ CREATE TABLE IF NOT EXISTS mac_vendors (
     last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create groups table
 CREATE TABLE IF NOT EXISTS groups (
     vlan_id VARCHAR(64) NOT NULL PRIMARY KEY,
     description VARCHAR(200)
+);
+
+-- Create auth_users table for web UI authentication
+CREATE TABLE IF NOT EXISTS auth_users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(64) NOT NULL UNIQUE,
+    password_hash VARCHAR(128) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
