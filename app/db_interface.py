@@ -1,3 +1,55 @@
+def count_auth_users():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM auth_users")
+    count = cursor.fetchone()[0]
+    cursor.close()
+    conn.close()
+    return count
+
+def add_auth_user(username, password_hash):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO auth_users (username, password_hash) VALUES (%s, %s)", (username, password_hash))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+def update_auth_username(user_id, new_username):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE auth_users SET username = %s WHERE id = %s", (new_username, user_id))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+def update_auth_password(user_id, new_password_hash):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE auth_users SET password_hash = %s WHERE id = %s", (new_password_hash, user_id))
+    conn.commit()
+    cursor.close()
+    conn.close()
+# ------------------------------
+# Web UI Authentication Functions
+# ------------------------------
+def get_auth_user_by_id(user_id):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM auth_users WHERE id = %s", (user_id,))
+    user = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    return user
+
+def get_auth_user_by_username(username):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM auth_users WHERE username = %s", (username,))
+    user = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    return user
 from flask import current_app, request, redirect, url_for, flash
 from db_connection import get_connection
 from datetime import datetime, timedelta, timezone

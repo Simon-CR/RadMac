@@ -1,4 +1,6 @@
 Flask
+Flask-Login
+Werkzeug
 mysql-connector-python
 requests
 BeautifulSoup4
