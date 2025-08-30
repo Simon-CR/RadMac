@@ -40,80 +40,13 @@ def login():
         else:
             error = 'Invalid username or password.'
     return render_template('login.html', error=error)
+            from flask import render_template, request, redirect, url_for, flash
+            from flask_login import login_user, logout_user, login_required, current_user
+            from db_interface import get_auth_user_by_username, add_auth_user, update_auth_username, update_auth_password, count_auth_users
+            from werkzeug.security import generate_password_hash, check_password_hash
 
-# Logout route
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('login'))
-
-# User menu (rename/change password)
-@app.route('/user_menu', methods=['GET', 'POST'])
-@login_required
-def user_menu():
-    message = error = None
-    if request.method == 'POST':
-        action = request.form.get('action')
-        if action == 'rename':
-            new_username = request.form['username']
-            if get_auth_user_by_username(new_username):
-                error = 'Username already exists.'
-            else:
-                update_auth_username(current_user.id, new_username)
-                message = 'Username updated.'
-        elif action == 'change_password':
-            pw1 = request.form['password']
-            pw2 = request.form['password2']
-            if pw1 != pw2:
-                error = 'Passwords do not match.'
-            else:
-                update_auth_password(current_user.id, generate_password_hash(pw1))
-                message = 'Password updated.'
-    return render_template('user_menu.html', message=message, error=error)
-from flask import Flask, redirect, url_for, render_template, request
-from flask_login import LoginManager, login_required, current_user, UserMixin
-from werkzeug.security import generate_password_hash, check_password_hash
-from views.index_views import index
-from views.user_views import user
-from views.group_views import group
-from views.stats_views import stats
-from views.maintenance_views import maintenance
-from config import app_config
-
-
-import logging, os
-from logging.handlers import RotatingFileHandler
-
-app = Flask(__name__)
-app.config.from_object(app_config)
-
-# Flask-Login setup
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-
-# User class for Flask-Login
-class AuthUser(UserMixin):
-    def __init__(self, id, username, password_hash):
-        self.id = id
-        self.username = username
-        self.password_hash = password_hash
-
-# User loader (to be implemented in db_interface)
-from db_interface import get_auth_user_by_id
-@login_manager.user_loader
-def load_user(user_id):
-    user = get_auth_user_by_id(user_id)
-    if user:
-        return AuthUser(user['id'], user['username'], user['password_hash'])
-    return None
-
-if app.config.get('LOG_TO_FILE'):
-    log_file = app.config.get('LOG_FILE_PATH', '/app/logs/app.log')
-    os.makedirs(os.path.dirname(log_file), exist_ok=True)
-    handler = RotatingFileHandler(log_file, maxBytes=1_000_000, backupCount=3)
-    handler.setLevel(logging.INFO)
+            # Authentication and user management routes (must be after app is defined)
+            # Enrollment route (first user setup)
     app.logger.addHandler(handler)
 
 app.logger.setLevel(logging.INFO)
