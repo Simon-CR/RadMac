@@ -156,16 +156,27 @@ nav .right .auth-btn.logout {
 }
 
 /* User menu sections */
+.auth-container {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background: var(--card-bg);
+  border-radius: 8px;
+  border: 1px solid #666;
+}
+
+.user-menu-sections {
+  display: flex;
+  gap: 2rem;
+  margin-top: 1rem;
+}
+
 .user-menu-section {
-  margin-bottom: 2rem;
+  flex: 1;
   padding: 1.5rem;
   background: var(--cell-bg);
   border-radius: 8px;
   border: 1px solid #555;
-}
-
-.user-menu-section:last-child {
-  margin-bottom: 0;
 }
 
 .user-menu-section h3 {
@@ -179,6 +190,18 @@ nav .right .auth-btn.logout {
 
 .user-menu-section form {
   margin: 0;
+}
+
+/* Responsive design for smaller screens */
+@media (max-width: 768px) {
+  .auth-container {
+    max-width: 400px;
+  }
+  
+  .user-menu-sections {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
 }
 
 h1, h2, h3 {
