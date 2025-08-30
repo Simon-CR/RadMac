@@ -1,7 +1,7 @@
-🛡️ RadMac v2.0 — Web Manager and radius server for MAC-based authentication / VLAN Assignment
+🛡️ RadMac v1.1 — Web Manager and radius server for MAC-based authentication / VLAN Assignment
 RadMac is a lightweight Flask web UI for managing MAC address-based access control and VLAN assignment, backed by a MariaDB/MySQL database. It incorporate a lightweight radius server.
 
-✨ New in v2.0: Authentication System
+✨ New in v1.1: Authentication System
 
 🔐 Web UI Authentication
 - Secure login system for web interface access
@@ -40,7 +40,7 @@ Preserves scroll position, sticky headers, toast notifications.
 📦 Setup (Docker Compose)
 The project includes a ready-to-use docker-compose.yml.
 
-⚠️ **Version 2.0 Upgrade Note**: This version introduces web authentication. On first access, you'll be prompted to create an admin user account. Existing installations will automatically migrate the database schema.
+⚠️ **Version 1.1 Upgrade Note**: This version introduces web authentication. On first access, you'll be prompted to create an admin user account. Existing installations will automatically migrate the database schema.
 
 1. Clone the repository
 bash
