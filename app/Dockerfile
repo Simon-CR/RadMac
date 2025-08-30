@@ -28,5 +28,5 @@ COPY . .
 # Expose internal port (Gunicorn default)
 EXPOSE 8080
 
-# Run the app via Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "wsgi:app", "--timeout", "120", "--workers", "2"]
+# Run DB migration before starting the app
+CMD ["/bin/sh", "-c", "python db_migrate.py && gunicorn --bind 0.0.0.0:8080 wsgi:app --timeout 120 --workers 2"]
