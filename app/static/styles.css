@@ -61,7 +61,7 @@ nav .right .auth-btn {
   color: black;
   border: none;
   padding: 6px 12px;
-  margin-left: 8px;
+  margin-right: 8px;
   border-radius: 4px;
   text-decoration: none;
   font-weight: bold;
@@ -153,6 +153,32 @@ nav .right .auth-btn.logout {
   background: rgba(255, 221, 87, 0.1);
   border-radius: 4px;
   margin-top: 1rem;
+}
+
+/* User menu sections */
+.user-menu-section {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: var(--cell-bg);
+  border-radius: 8px;
+  border: 1px solid #555;
+}
+
+.user-menu-section:last-child {
+  margin-bottom: 0;
+}
+
+.user-menu-section h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: var(--accent);
+  font-size: 1.1rem;
+  border-bottom: 1px solid #555;
+  padding-bottom: 0.5rem;
+}
+
+.user-menu-section form {
+  margin: 0;
 }
 
 h1, h2, h3 {
