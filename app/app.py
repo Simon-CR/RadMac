@@ -6,6 +6,7 @@ from views.user_views import user
 from views.group_views import group
 from views.stats_views import stats
 from views.maintenance_views import maintenance
+from views.health_views import health
 from config import app_config
 
 
@@ -124,6 +125,7 @@ app.register_blueprint(user, url_prefix='/user')
 app.register_blueprint(group, url_prefix='/group')
 app.register_blueprint(stats, url_prefix='/stats')
 app.register_blueprint(maintenance, url_prefix='/maintenance')
+app.register_blueprint(health)
 
 @app.route('/user_list')
 def legacy_user_list():
@@ -137,7 +139,7 @@ def legacy_group_list():
 # Protect all routes except homepage
 @app.before_request
 def require_login():
-    allowed = ['index_redirect', 'login', 'enroll', 'static']
+    allowed = ['index_redirect', 'login', 'enroll', 'static', 'health.health_check']
     if request.endpoint not in allowed and not current_user.is_authenticated:
         return redirect(url_for('login'))
 
