@@ -65,6 +65,28 @@ services:
     networks:
       - webnet
 
+  # Optional: Health monitoring and automated remediation
+  # Uncomment the watchdog service below to enable automated health monitoring
+  # The watchdog monitors the /health endpoint and can restart services, send alerts, etc.
+  # 
+  # watchdog:
+  #   image: simonclr/radmac-watchdog:latest
+  #   restart: unless-stopped
+  #   environment:
+  #     - WATCHDOG_HEALTH_URL=http://app:8080/health
+  #     - WATCHDOG_CHECK_INTERVAL=30
+  #     - WATCHDOG_ACTIONS=log,webhook
+  #     - WATCHDOG_WEBHOOK_URL=${WATCHDOG_WEBHOOK_URL:-}
+  #     - WATCHDOG_MAX_RESTART_ATTEMPTS=3
+  #     - WATCHDOG_CONTAINER_PREFIX=radmac
+  #   volumes:
+  #     # Uncomment the line below to enable container restart functionality
+  #     # - /var/run/docker.sock:/var/run/docker.sock
+  #   depends_on:
+  #     - app
+  #   networks:
+  #     - webnet
+
 volumes:
   db_data:
 
