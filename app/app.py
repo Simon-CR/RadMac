@@ -139,14 +139,9 @@ def legacy_group_list():
 # Protect all routes except homepage
 @app.before_request
 def require_login():
-    allowed = ['index_redirect', 'login', 'enroll', 'static', 'health_check']
+    allowed = ['index_redirect', 'login', 'enroll', 'static', 'health.health_check']
     if request.endpoint not in allowed and not current_user.is_authenticated:
         return redirect(url_for('login'))
-
-
-@app.route('/health')
-def health_check():
-    return {'status': 'ok'}, 200
 
 @app.route('/')
 def index_redirect():
