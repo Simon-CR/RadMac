@@ -70,7 +70,7 @@ services:
   # The watchdog monitors the /health endpoint and can restart services, send alerts, etc.
   # 
   # watchdog:
-  #   image: simonclr/radmac-watchdog:test
+  #   image: simonclr/radmac-watchdog:latest
   #   restart: unless-stopped
   #   environment:
   #     - WATCHDOG_HEALTH_URL=http://app:8080/health
