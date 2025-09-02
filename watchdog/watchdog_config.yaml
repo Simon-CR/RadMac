@@ -1,0 +1,48 @@
+# RadMac Watchdog Configuration
+# Define per-service monitoring, intervals, and alert actions here.
+
+
+# Example configuration for RadMac Watchdog
+services:
+  app:
+    health_url: http://app:8080/health
+    interval_env: WATCHDOG_CHECK_INTERVAL_APP
+    default_interval: 30
+    actions: [log, email, discord, pushbullet, slack, teams, telegram, webhook, restart]
+  database:
+    health_url: http://db:8080/health
+    interval_env: WATCHDOG_CHECK_INTERVAL_DATABASE
+    default_interval: 30
+    actions: [log, email, slack, webhook, restart]
+  radius:
+    health_url: http://radius:8080/health
+    interval_env: WATCHDOG_CHECK_INTERVAL_RADIUS
+    default_interval: 30
+    actions: [log, telegram, webhook]
+
+# Supported actions:
+#   log        - Log to stdout or file
+#   email      - Send email (SMTP or service)
+#   discord    - Discord webhook
+#   pushbullet - Pushbullet notification
+#   slack      - Slack webhook
+#   teams      - Microsoft Teams webhook
+#   telegram   - Telegram bot message
+#   webhook    - Generic webhook (custom URL)
+#   restart    - Restart the affected container/service
+
+# Example environment variables for notification credentials:
+#
+# EMAIL_HOST=smtp.example.com
+# EMAIL_PORT=587
+# EMAIL_USER=your@email.com
+# EMAIL_PASSWORD=yourpassword
+# EMAIL_TO=destination@email.com
+#
+# WATCHDOG_DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+# WATCHDOG_PUSHBULLET_TOKEN=your-pushbullet-token
+# WATCHDOG_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+# WATCHDOG_TEAMS_WEBHOOK_URL=https://outlook.office.com/webhook/...
+# WATCHDOG_TELEGRAM_BOT_TOKEN=your-telegram-bot-token
+# WATCHDOG_TELEGRAM_CHAT_ID=your-chat-id
+# WATCHDOG_WEBHOOK_URL=https://your-custom-webhook-url
