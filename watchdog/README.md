@@ -86,7 +86,7 @@ watchdog:
 
 - **App issues**: Restarts the app container
 - **Database issues**: Restarts the database container (use with caution)
-- **RADIUS issues**: Logs only (typically external service)
+- **RADIUS issues**: Restarts the RADIUS container (integrated in RadMac)
 
 ## Security Considerations
 
