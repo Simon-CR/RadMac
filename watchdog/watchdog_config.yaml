@@ -10,15 +10,15 @@ services:
     default_interval: 30
     actions: [log, email, discord, pushbullet, slack, teams, telegram, webhook, restart]
   database:
-    health_url: http://db:8080/health
+    health_url: http://app:8080/health
     interval_env: WATCHDOG_CHECK_INTERVAL_DATABASE
     default_interval: 30
     actions: [log, email, slack, webhook, restart]
   radius:
-    health_url: http://radius:8080/health
+    health_url: http://app:8080/health
     interval_env: WATCHDOG_CHECK_INTERVAL_RADIUS
     default_interval: 30
-    actions: [log, telegram, webhook]
+    actions: [log, telegram, webhook, restart]
 
 # Supported actions:
 #   log        - Log to stdout or file
