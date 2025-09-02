@@ -58,7 +58,6 @@
       })
       .then(r => r.json())
       .then(data => {
-        // Update: Use 'output' from the API response
         resultBox.textContent = data.output || "No data returned.";
       })
       .catch(err => {

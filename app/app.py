@@ -28,7 +28,6 @@ class AuthUser(UserMixin):
         self.username = username
         self.password_hash = password_hash
 
-# User loader (to be implemented in db_interface)
 from db_interface import get_auth_user_by_id
 @login_manager.user_loader
 def load_user(user_id):

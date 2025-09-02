@@ -267,7 +267,6 @@ table.styled-table {
   text-align: center;
 }
 
-/* 🧩 Fix: Remove right border from last column */
 .styled-table thead th:last-child {
   border-right: none;
 }

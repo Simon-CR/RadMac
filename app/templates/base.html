@@ -44,7 +44,6 @@
       localStorage.setItem('theme', next);
     });
 
-    // Toast function
     window.showToast = function (msg, duration = 3000) {
       const toast = document.getElementById('toast');
       toast.textContent = msg;
@@ -52,14 +51,12 @@
       setTimeout(() => toast.classList.remove('show'), duration);
     };
 
-    // Scroll-to-top button
     const scrollBtn = document.getElementById('scrollTopBtn');
     window.onscroll = () => {
       scrollBtn.style.display = window.scrollY > 150 ? 'block' : 'none';
     };
     scrollBtn.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // Preserve scroll position
     window.addEventListener('beforeunload', () => {
       sessionStorage.setItem('scrollTop', window.scrollY);
     });
