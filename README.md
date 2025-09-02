@@ -70,4 +70,22 @@ curl -i http://localhost:8080/health
 This endpoint is designed for use with external monitoring tools, load balancers, or the built-in watchdog (see separate documentation).
 
 📄 License
+
+---
+
+
+## 📝 Changelog
+
+### v1.2.0 (2025-09-02)
+- Added `/health` API endpoint for service monitoring (see Health API section)
+- Improved documentation and setup instructions
+
+### v1.1.0
+- Previous stable release (see tag v1.1.0 for details)
+
+### v1.0
+- Initial public release
+
+---
+
 MIT — do whatever you want, no guarantees.
