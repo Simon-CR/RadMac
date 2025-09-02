@@ -2,7 +2,7 @@
 
 services:
   db:
-    image: simonclr/radmac-db:monitoring-enabled
+    image: simonclr/radmac-db:latest
     environment:
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
       MARIADB_DATABASE: ${DB_NAME}
@@ -12,6 +12,7 @@ services:
     restart: unless-stopped
     ports:
       - "3306:3306"
+      - "8082:8080"  # Database health endpoint
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
