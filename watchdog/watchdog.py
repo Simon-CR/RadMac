@@ -30,7 +30,18 @@ class RadMacWatchdog:
         self.last_status = {}
         self.restart_attempts = {}
         self.docker_client = None
-        self.max_restart_attempts = int(os.getenv('WATCHDOG_MAX_RESTART_ATTEMPTS', '3'))
+        
+        # Parse max restart attempts with error handling
+        try:
+            max_attempts_env = os.getenv('WATCHDOG_MAX_RESTART_ATTEMPTS', '3')
+            if max_attempts_env.startswith('{') and max_attempts_env.endswith('}'):
+                logger.warning(f"WATCHDOG_MAX_RESTART_ATTEMPTS appears to be a template: {max_attempts_env}, using default (3)")
+                self.max_restart_attempts = 3
+            else:
+                self.max_restart_attempts = int(max_attempts_env)
+        except (ValueError, TypeError):
+            logger.warning(f"Invalid WATCHDOG_MAX_RESTART_ATTEMPTS value: {os.getenv('WATCHDOG_MAX_RESTART_ATTEMPTS')}, using default (3)")
+            self.max_restart_attempts = 3
         self.container_prefix = os.getenv('WATCHDOG_CONTAINER_PREFIX', 'radmac')
         self.load_config()
         self.init_docker()
@@ -44,8 +55,21 @@ class RadMacWatchdog:
             config = yaml.safe_load(f)
         self.services = {}
         for name, svc in config.get('services', {}).items():
-            # Allow override by env var
-            interval = int(os.getenv(svc.get('interval_env', ''), svc.get('default_interval', 30)))
+            # Parse interval with error handling
+            interval_env_var = svc.get('interval_env', '')
+            default_interval = svc.get('default_interval', 30)
+            
+            try:
+                interval_env_value = os.getenv(interval_env_var, str(default_interval))
+                if interval_env_value.startswith('{') and interval_env_value.endswith('}'):
+                    logger.warning(f"Interval environment variable {interval_env_var} appears to be a template: {interval_env_value}, using default ({default_interval})")
+                    interval = default_interval
+                else:
+                    interval = int(interval_env_value)
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid interval value for {name}: {os.getenv(interval_env_var)}, using default ({default_interval})")
+                interval = default_interval
+                
             actions = svc.get('actions', ['log'])
             self.services[name] = {
                 'health_url': svc['health_url'],
@@ -264,7 +288,18 @@ class RadMacWatchdog:
 
 
     def run(self):
-        grace = int(os.getenv('WATCHDOG_STARTUP_GRACE_PERIOD', '60'))
+        try:
+            grace_env = os.getenv('WATCHDOG_STARTUP_GRACE_PERIOD', '60')
+            # Handle case where environment variable is a template string
+            if grace_env.startswith('{') and grace_env.endswith('}'):
+                logger.warning(f"Environment variable appears to be a template: {grace_env}, using default value")
+                grace = 60
+            else:
+                grace = int(grace_env)
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Invalid WATCHDOG_STARTUP_GRACE_PERIOD value: {os.getenv('WATCHDOG_STARTUP_GRACE_PERIOD')}, using default (60)")
+            grace = 60
+            
         if grace > 0:
             logger.info(f"Startup grace period: waiting {grace} seconds before monitoring...")
             time.sleep(grace)
