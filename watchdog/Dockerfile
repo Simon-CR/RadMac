@@ -7,8 +7,10 @@ WORKDIR /watchdog
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy watchdog script
+
+# Copy watchdog script and config
 COPY watchdog.py .
+COPY watchdog_config.yaml .
 
 # Make script executable
 RUN chmod +x watchdog.py
