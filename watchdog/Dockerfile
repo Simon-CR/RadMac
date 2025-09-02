@@ -8,9 +8,15 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 
-# Copy watchdog script and config
+
+# Copy watchdog script
 COPY watchdog.py .
-COPY watchdog_config.yaml .
+
+# Only copy the example config if one does not already exist (for local/dev builds)
+RUN [ ! -f /watchdog/watchdog_config.yaml ] && cp /watchdog/watchdog_config.yaml /watchdog/watchdog_config.yaml.example || true
+COPY watchdog_config.yaml /watchdog/watchdog_config.yaml.example
+
+# In production, always mount your own watchdog_config.yaml as a volume to avoid overwriting changes.
 
 # Make script executable
 RUN chmod +x watchdog.py

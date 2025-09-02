@@ -2,34 +2,42 @@
 
 services:
   db:
-    image: simonclr/radmac-db:latest
+    image: simonclr/radmac-db:monitoring-enabled
     environment:
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
       MARIADB_DATABASE: ${DB_NAME}
       MARIADB_USER: ${DB_USER}
       MARIADB_PASSWORD: ${DB_PASSWORD}
+      MARIADB_AUTO_UPGRADE: 1
     restart: unless-stopped
     ports:
       - "3306:3306"
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      start_period: 10s
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-u", "root", "-p${MARIADB_ROOT_PASSWORD}"]
+      start_period: 30s
       interval: 10s
       timeout: 5s
       retries: 3
     networks:
       - webnet
   radius:
-    image: simonclr/radmac-radius:latest
+    image: simonclr/radmac-radius:test
     depends_on:
       - db
     env_file:
       - .env
     ports:
       - "1812:1812/udp"
+      - "8083:8080"  # Health endpoint
     restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
     networks:
       - webnet
 
@@ -72,17 +80,12 @@ services:
   watchdog:
     image: simonclr/radmac-watchdog:latest
     restart: unless-stopped
-    environment:
-      - WATCHDOG_HEALTH_URL=http://app:8080/health
-      - WATCHDOG_CHECK_INTERVAL=30
-      - WATCHDOG_ACTIONS=log,webhook
-      - WATCHDOG_WEBHOOK_URL=${WATCHDOG_WEBHOOK_URL:-}
-      - WATCHDOG_MAX_RESTART_ATTEMPTS=3
-      - WATCHDOG_CONTAINER_PREFIX=radmac
+    env_file:
+      - .env
     volumes:
       - ./watchdog/watchdog_config.yaml:/watchdog/watchdog_config.yaml
-      # Uncomment the line below to enable container restart functionality
-      # - /var/run/docker.sock:/var/run/docker.sock
+      # Enable container restart functionality
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       - app
     networks:

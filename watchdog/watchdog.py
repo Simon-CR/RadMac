@@ -237,14 +237,20 @@ class RadMacWatchdog:
 
     def handle_status_change(self, service_name, health_response, actions):
         current_healthy = health_response['healthy']
+        status_changed = False
+        
         if self.last_status.get(service_name) is None:
             logger.info(f"Initial health check for {service_name} - monitoring started")
+            status_changed = True
         elif self.last_status[service_name] != current_healthy:
+            status_changed = True
             if current_healthy:
                 logger.info(f"🎉 {service_name} recovered - healthy!")
             else:
                 logger.error(f"🚨 {service_name} became unhealthy!")
-        if not current_healthy and health_response.get('data'):
+        
+        # Only trigger actions on status change, not on every failed check
+        if status_changed and not current_healthy and health_response.get('data'):
             # If health endpoint returns per-service, use that, else just this service
             if 'services' in health_response['data']:
                 for sub_name, sub_data in health_response['data']['services'].items():
@@ -252,26 +258,63 @@ class RadMacWatchdog:
                         self.handle_unhealthy_service(sub_name, sub_data, actions)
             else:
                 self.handle_unhealthy_service(service_name, health_response['data'], actions)
+        
         self.last_status[service_name] = current_healthy
     
 
+
     def run(self):
+        grace = int(os.getenv('WATCHDOG_STARTUP_GRACE_PERIOD', '60'))
+        if grace > 0:
+            logger.info(f"Startup grace period: waiting {grace} seconds before monitoring...")
+            time.sleep(grace)
         logger.info("RadMac Watchdog started - monitoring all configured services")
         next_check = {name: 0 for name in self.services}
+        app_health = None
         while True:
             now = time.time()
+            # Always check app first if present
+            if 'app' in self.services and now >= next_check['app']:
+                try:
+                    app_health = self.check_health(self.services['app']['health_url'])
+                    if app_health:
+                        self.handle_status_change('app', app_health, self.services['app']['actions'])
+                    else:
+                        logger.error("No health response for app")
+                    if app_health and app_health['healthy']:
+                        self.restart_attempts.clear()
+                except Exception as e:
+                    logger.error(f"Watchdog error for app: {e}")
+                next_check['app'] = now + self.services['app']['interval']
+            # Now check other services
             for name, svc in self.services.items():
+                if name == 'app':
+                    continue
                 if now >= next_check[name]:
-                    try:
-                        health_response = self.check_health(svc['health_url'])
-                        if health_response:
-                            self.handle_status_change(name, health_response, svc['actions'])
-                        else:
-                            logger.error(f"No health response for {name}")
-                        if health_response and health_response['healthy']:
-                            self.restart_attempts.clear()
-                    except Exception as e:
-                        logger.error(f"Watchdog error for {name}: {e}")
+                    # If this service uses app's /health, only act if app is healthy
+                    if svc['health_url'] == self.services['app']['health_url']:
+                        if not (app_health and app_health['healthy'] and app_health.get('data')):
+                            logger.info(f"Skipping {name} check: app is not healthy or /health unavailable")
+                            next_check[name] = now + svc['interval']
+                            continue
+                        # Only act if /health reports this service as unhealthy
+                        if 'services' in app_health['data'] and name in app_health['data']['services']:
+                            sub_data = app_health['data']['services'][name]
+                            if sub_data.get('status') == 'unhealthy':
+                                self.handle_unhealthy_service(name, sub_data, svc['actions'])
+                        # Otherwise, do nothing
+                    else:
+                        # Direct health check for this service
+                        try:
+                            health_response = self.check_health(svc['health_url'])
+                            if health_response:
+                                self.handle_status_change(name, health_response, svc['actions'])
+                            else:
+                                logger.error(f"No health response for {name}")
+                            if health_response and health_response['healthy']:
+                                self.restart_attempts.clear()
+                        except Exception as e:
+                            logger.error(f"Watchdog error for {name}: {e}")
                     next_check[name] = now + svc['interval']
             try:
                 time.sleep(1)

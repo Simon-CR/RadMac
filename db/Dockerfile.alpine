@@ -1,0 +1,45 @@
+FROM alpine:3.19
+
+# Install MariaDB, Python, and monitoring tools
+RUN apk add --no-cache \
+    mariadb \
+    mariadb-client \
+    mariadb-server-utils \
+    python3 \
+    py3-pip \
+    py3-flask \
+    curl \
+    bash \
+    su-exec \
+    tzdata
+
+# Create necessary directories and set permissions
+RUN mkdir -p /var/lib/mysql /var/run/mysqld /etc/mysql/conf.d && \
+    chown -R mysql:mysql /var/lib/mysql /var/run/mysqld
+
+# Copy MariaDB configuration
+COPY conf.d/* /etc/mysql/conf.d/
+
+# Copy initialization scripts
+COPY init/* /docker-entrypoint-initdb.d/
+
+# Create health check endpoint
+COPY health_endpoint.py /usr/local/bin/health_endpoint.py
+RUN chmod +x /usr/local/bin/health_endpoint.py
+
+# Copy custom entrypoint
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Set up supervisord for multi-process management
+RUN apk add --no-cache supervisor
+COPY supervisord.conf /etc/supervisord.conf
+
+# Expose MariaDB and health check ports
+EXPOSE 3306 8080
+
+# Create volume for data persistence
+VOLUME ["/var/lib/mysql"]
+
+# Use supervisord to run both MariaDB and health endpoint
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]

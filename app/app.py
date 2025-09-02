@@ -127,6 +127,15 @@ app.register_blueprint(stats, url_prefix='/stats')
 app.register_blueprint(maintenance, url_prefix='/maintenance')
 app.register_blueprint(health)
 
+# Initialize database connection pool
+from db_connection import init_connection_pool
+try:
+    init_connection_pool()
+    print("✅ App database connection pool initialized")
+except Exception as e:
+    print(f"❌ Failed to initialize database pool: {e}")
+    # Don't exit - let app start and handle connection errors gracefully
+
 @app.route('/user_list')
 def legacy_user_list():
     return redirect(url_for('user.user_list'))

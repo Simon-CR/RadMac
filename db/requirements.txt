@@ -1,4 +1,2 @@
-pyrad
 mysql-connector-python
-
 flask

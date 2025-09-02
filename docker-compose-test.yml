@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  db-test:
+    image: radmac-db-test
+    environment:
+      MARIADB_ROOT_PASSWORD: testpassword
+      MARIADB_DATABASE: testdb
+      MARIADB_USER: testuser
+      MARIADB_PASSWORD: testpass
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-u", "root", "-ptestpassword"]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    ports:
+      - "3307:3306"

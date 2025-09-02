@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # Simple test app that provides a health endpoint
+  test-app:
+    image: python:3.9-slim
+    container_name: test-app
+    networks:
+      - test-network
+    ports:
+      - "8081:8080"
+    command: |
+      sh -c "
+      pip install flask &&
+      cat > /app.py << 'EOF'
+      from flask import Flask, jsonify
+      import os
+      
+      app = Flask(__name__)
+      
+      @app.route('/health')
+      def health():
+          return jsonify({'status': 'healthy', 'service': 'test-app'})
+      
+      if __name__ == '__main__':
+          app.run(host='0.0.0.0', port=8080, debug=True)
+      EOF
+      python /app.py
+      "
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Simple test database simulator
+  test-db:
+    image: python:3.9-slim
+    container_name: test-db
+    networks:
+      - test-network
+    ports:
+      - "8082:8080"
+    command: |
+      sh -c "
+      pip install flask &&
+      cat > /db.py << 'EOF'
+      from flask import Flask, jsonify
+      import os
+      
+      app = Flask(__name__)
+      
+      @app.route('/health')
+      def health():
+          return jsonify({'status': 'healthy', 'service': 'test-db'})
+      
+      @app.route('/ping')
+      def ping():
+          return 'pong'
+      
+      if __name__ == '__main__':
+          app.run(host='0.0.0.0', port=8080, debug=True)
+      EOF
+      python /db.py
+      "
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Test watchdog with restart enabled
+  test-watchdog:
+    build:
+      context: ../watchdog
+      dockerfile: Dockerfile
+    container_name: test-watchdog
+    networks:
+      - test-network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./test-watchdog-config.yaml:/app/watchdog_config.yaml:ro
+    environment:
+      - WATCHDOG_CHECK_INTERVAL_APP=15
+      - WATCHDOG_CHECK_INTERVAL_DATABASE=15
+    depends_on:
+      - test-app
+      - test-db
+
+networks:
+  test-network:
+    driver: bridge

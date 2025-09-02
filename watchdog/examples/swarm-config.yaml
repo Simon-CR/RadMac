@@ -1,6 +1,5 @@
-
-# RadMac Watchdog Configuration
-# Define per-service monitoring, intervals, and alert actions here.
+# RadMac Watchdog Configuration - Docker Swarm Example
+# This configuration omits restart actions for Docker Swarm deployments
 #
 # ------------------------------------------------------------------------------
 # CONFIG VERSIONING
@@ -8,58 +7,41 @@
 version: 1.2.2
 
 # ------------------------------------------------------------------------------
-# CONFIG CHANGE LOG
+# DEPLOYMENT NOTE  
 # ------------------------------------------------------------------------------
-# v1.2.2 (2025-09-02):
-#   - Fixed alert spam: actions now only trigger on status changes
-#   - Added deployment-specific configuration examples
-#   - Clarified restart action usage for Swarm vs single-host deployments
-#   - Added comprehensive health monitoring for all services
-# v1.2.1 (2025-09-02):
-#   - Added direct health_url for db and radius services
-#   - Added version field and config change log
-#   - Changed default_interval key for clarity
-#
-
+# For Docker Swarm: Omit 'restart' action, let Swarm handle auto-recovery
+# For single-host Docker Compose: Add 'restart' action for automatic recovery
 
 # RadMac Watchdog Service Configuration
-# NOTE: For Docker Swarm deployments, avoid 'restart' action as Swarm handles auto-recovery
-# For single-host Docker Compose deployments, 'restart' action works perfectly
 services:
   app:
     health_url: http://app:8080/health
     interval_env: WATCHDOG_CHECK_INTERVAL_APP
     default_interval: 30
-    actions: [log, email, discord, pushbullet, slack, teams, telegram, webhook]  # Add 'restart' for single-host
+    actions: [log, email, discord, pushbullet, slack, teams, telegram, webhook]
   database:
     health_url: http://db:8080/health
     interval_env: WATCHDOG_CHECK_INTERVAL_DATABASE
     default_interval: 30
-    actions: [log, email, slack, webhook]  # Add 'restart' for single-host
+    actions: [log, email, slack, webhook]
   radius:
     health_url: http://radius:8080/health
     interval_env: WATCHDOG_CHECK_INTERVAL_RADIUS
     default_interval: 30
-    actions: [log, telegram, webhook]  # Add 'restart' for single-host
+    actions: [log, telegram, webhook]
 
 # Supported actions:
 #   log        - Log to stdout or file
-#   email      - Send email (SMTP or service)  
+#   email      - Send email (SMTP or service)
 #   discord    - Discord webhook
 #   pushbullet - Pushbullet notification
 #   slack      - Slack webhook
 #   teams      - Microsoft Teams webhook
 #   telegram   - Telegram bot message
 #   webhook    - Generic webhook (custom URL)
-#   restart    - Restart the affected container/service
-#                * Works perfectly in single-host Docker Compose
-#                * Not recommended for Docker Swarm (Swarm handles auto-recovery)
+#   restart    - Restart the affected container/service (single-host only)
 
-# Deployment-specific configurations available in examples/:
-#   examples/single-host-config.yaml - Configuration with restart actions
-#   examples/swarm-config.yaml       - Configuration without restart actions
-
-# Example environment variables for notification credentials:
+# Environment variables for notification credentials:
 #
 # EMAIL_HOST=smtp.example.com
 # EMAIL_PORT=587

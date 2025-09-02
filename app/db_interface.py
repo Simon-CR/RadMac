@@ -1,11 +1,40 @@
+from flask import current_app, request, redirect, url_for, flash
+from db_connection import get_connection
+from datetime import datetime, timedelta, timezone
+import mysql.connector
+import requests
+import time
+import os
+import subprocess
+import pytz
+import shutil
+
+def safe_db_operation(operation_func, default_return=None):
+    """Wrapper for database operations with proper error handling"""
+    try:
+        return operation_func()
+    except mysql.connector.Error as e:
+        print(f"❌ Database error: {e}")
+        if current_app:
+            flash(f"Database connection error. Please try again later.", "error")
+        return default_return
+    except Exception as e:
+        print(f"❌ Unexpected error: {e}")
+        if current_app:
+            flash(f"An unexpected error occurred. Please try again.", "error")
+        return default_return
+
 def count_auth_users():
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM auth_users")
-    count = cursor.fetchone()[0]
-    cursor.close()
-    conn.close()
-    return count
+    def _operation():
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM auth_users")
+        count = cursor.fetchone()[0]
+        cursor.close()
+        conn.close()
+        return count
+    
+    return safe_db_operation(_operation, 0)
 
 def add_auth_user(username, password_hash):
     conn = get_connection()
@@ -50,16 +79,6 @@ def get_auth_user_by_username(username):
     cursor.close()
     conn.close()
     return user
-from flask import current_app, request, redirect, url_for, flash
-from db_connection import get_connection
-from datetime import datetime, timedelta, timezone
-import mysql.connector
-import requests
-import time
-import os
-import subprocess
-import pytz
-import shutil
 
 
 # ------------------------------

@@ -1,0 +1,59 @@
+# RadMac Watchdog Configuration - TEST MODE
+# Fast intervals and log-only actions for testing
+#
+# ------------------------------------------------------------------------------
+# CONFIG VERSIONING
+# ------------------------------------------------------------------------------
+version: 1.2.1-test
+
+# ------------------------------------------------------------------------------
+# CONFIG CHANGE LOG
+# ------------------------------------------------------------------------------
+# v1.2.1-test (2025-09-02):
+#   - Test configuration with shorter intervals
+#   - Log-only actions to avoid service disruption during testing
+#   - Added test scenarios documentation
+#
+
+# TEST MODE - Short intervals, log-only actions
+services:
+  app:
+    health_url: http://app:8080/health
+    interval_env: WATCHDOG_CHECK_INTERVAL_APP
+    default_interval: 10  # 10 seconds for faster testing
+    actions: [log]  # Only log during testing
+  database:
+    health_url: http://db:8080/health
+    interval_env: WATCHDOG_CHECK_INTERVAL_DATABASE
+    default_interval: 10  # 10 seconds for faster testing
+    actions: [log]  # Only log during testing
+  radius:
+    health_url: http://radius:8080/health
+    interval_env: WATCHDOG_CHECK_INTERVAL_RADIUS
+    default_interval: 10  # 10 seconds for faster testing
+    actions: [log]  # Only log during testing
+
+# TEST SCENARIOS TO TRY:
+# 1. Scale down app service to 0 replicas
+# 2. Scale down radius service to 0 replicas  
+# 3. Pause database container temporarily
+# 4. Scale down database service to 0 replicas
+# 5. Network isolation test (if possible)
+
+# To enable test mode:
+# 1. Replace watchdog_config.yaml with this file
+# 2. Restart watchdog service
+# 3. Monitor logs for faster health check cycles
+# 4. Perform test scenarios in Portainer
+# 5. Restore original config when done
+
+# Supported actions (currently disabled for testing):
+#   log        - Log to stdout or file ✅ (enabled for testing)
+#   email      - Send email (SMTP or service) 
+#   discord    - Discord webhook
+#   pushbullet - Pushbullet notification
+#   slack      - Slack webhook
+#   teams      - Microsoft Teams webhook
+#   telegram   - Telegram bot message
+#   webhook    - Generic webhook (custom URL)
+#   restart    - Restart the affected container/service
