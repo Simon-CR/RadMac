@@ -257,33 +257,89 @@ class RadMacWatchdog:
                     logger.info(f"Restart initiated for {service_name}")
                 else:
                     logger.error(f"Failed to restart {service_name}")
+            elif action == 'recover':
+                self.trigger_recovery(service_name, service_data)
     
+    def trigger_recovery(self, service_name: str, health_data: Dict[str, Any]):
+        """Trigger recovery actions for degraded services"""
+        try:
+            if service_name == 'database':
+                logger.info(f"Triggering database recovery for {service_name}")
+                # Execute the database recovery script inside the database container
+                container_name = f"{self.container_prefix}_{service_name}_1"
+                try:
+                    container = self.docker_client.containers.get(container_name)
+                    exec_result = container.exec_run(
+                        'python3 /usr/local/bin/recovery_script.py',
+                        stdout=True,
+                        stderr=True
+                    )
+                    if exec_result.exit_code == 0:
+                        logger.info(f"Database recovery completed successfully: {exec_result.output.decode()}")
+                    else:
+                        logger.error(f"Database recovery failed: {exec_result.output.decode()}")
+                except docker.errors.NotFound:
+                    logger.error(f"Container {container_name} not found for recovery")
+                except Exception as e:
+                    logger.error(f"Failed to execute recovery script: {e}")
+            else:
+                logger.info(f"Recovery action for {service_name} - logging degraded state")
+                warnings = health_data.get('warnings', [])
+                logger.warning(f"Service {service_name} degraded: {', '.join(warnings)}")
+        except Exception as e:
+            logger.error(f"Recovery action failed for {service_name}: {e}")
 
     def handle_status_change(self, service_name, health_response, actions):
         current_healthy = health_response['healthy']
-        status_changed = False
+        current_data = health_response.get('data', {})
+        current_status = current_data.get('status', 'healthy' if current_healthy else 'unhealthy')
         
-        if self.last_status.get(service_name) is None:
+        status_changed = False
+        previous_status = self.last_status.get(service_name, {})
+        previous_healthy = previous_status.get('healthy') if isinstance(previous_status, dict) else previous_status
+        previous_state = previous_status.get('status') if isinstance(previous_status, dict) else None
+        
+        if previous_healthy is None:
             logger.info(f"Initial health check for {service_name} - monitoring started")
             status_changed = True
-        elif self.last_status[service_name] != current_healthy:
+        elif previous_healthy != current_healthy or previous_state != current_status:
             status_changed = True
-            if current_healthy:
+            if current_healthy and current_status == 'healthy':
                 logger.info(f"🎉 {service_name} recovered - healthy!")
+            elif current_healthy and current_status == 'degraded':
+                logger.warning(f"⚠️ {service_name} is degraded but functional")
+                # Trigger recovery actions for degraded services
+                if 'recover' not in actions:
+                    actions = actions + ['recover']  # Add recovery action
             else:
                 logger.error(f"🚨 {service_name} became unhealthy!")
         
+        # Handle degraded status - trigger recovery actions
+        if current_status == 'degraded' and status_changed:
+            logger.info(f"Triggering recovery actions for degraded service: {service_name}")
+            recovery_actions = [action for action in actions if action in ['recover', 'log']]
+            if 'recover' in actions:
+                self.trigger_recovery(service_name, current_data)
+            if 'log' in recovery_actions:
+                warnings = current_data.get('warnings', [])
+                logger.warning(f"{service_name} degraded - warnings: {', '.join(warnings)}")
+        
         # Only trigger actions on status change, not on every failed check
-        if status_changed and not current_healthy and health_response.get('data'):
+        if status_changed and not current_healthy and current_data:
             # If health endpoint returns per-service, use that, else just this service
-            if 'services' in health_response['data']:
-                for sub_name, sub_data in health_response['data']['services'].items():
+            if 'services' in current_data:
+                for sub_name, sub_data in current_data['services'].items():
                     if sub_data.get('status') == 'unhealthy':
                         self.handle_unhealthy_service(sub_name, sub_data, actions)
             else:
-                self.handle_unhealthy_service(service_name, health_response['data'], actions)
+                self.handle_unhealthy_service(service_name, current_data, actions)
         
-        self.last_status[service_name] = current_healthy
+        # Store both healthy status and detailed status
+        self.last_status[service_name] = {
+            'healthy': current_healthy,
+            'status': current_status,
+            'timestamp': time.time()
+        }
     
 
 

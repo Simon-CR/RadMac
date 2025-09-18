@@ -5,11 +5,18 @@
 # ------------------------------------------------------------------------------
 # CONFIG VERSIONING
 # ------------------------------------------------------------------------------
-version: 1.2.2
+version: 1.2.4
 
 # ------------------------------------------------------------------------------
 # CONFIG CHANGE LOG
 # ------------------------------------------------------------------------------
+# v1.2.4 (2025-09-18):
+#   - Enhanced database health monitoring to detect connection issues
+#   - Added 'degraded' status for services with warnings but still functional
+#   - Added 'recover' action for database connection cleanup and recovery
+#   - Improved detection of NFS-related connection drops and stale connections
+# v1.2.3 (2025-09-02):
+#   - Fixed environment variable parsing to handle template strings gracefully
 # v1.2.2 (2025-09-02):
 #   - Fixed alert spam: actions now only trigger on status changes
 #   - Added deployment-specific configuration examples
@@ -35,7 +42,7 @@ services:
     health_url: http://db:8080/health
     interval_env: WATCHDOG_CHECK_INTERVAL_DATABASE
     default_interval: 30
-    actions: [log, email, slack, webhook]  # Add 'restart' for single-host
+    actions: [log, recover, email, slack, webhook]  # Add 'restart' for single-host
   radius:
     health_url: http://radius:8080/health
     interval_env: WATCHDOG_CHECK_INTERVAL_RADIUS
@@ -54,6 +61,9 @@ services:
 #   restart    - Restart the affected container/service
 #                * Works perfectly in single-host Docker Compose
 #                * Not recommended for Docker Swarm (Swarm handles auto-recovery)
+#   recover    - Execute service-specific recovery actions
+#                * For database: cleans up stale connections and resets connection pools
+#                * For other services: logs degraded state warnings
 
 # Deployment-specific configurations available in examples/:
 #   examples/single-host-config.yaml - Configuration with restart actions

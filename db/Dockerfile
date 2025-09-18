@@ -11,9 +11,11 @@ COPY init/ /docker-entrypoint-initdb.d/
 
 # Copy health monitoring files
 COPY health_endpoint.py /usr/local/bin/health_endpoint.py
+COPY recovery_script.py /usr/local/bin/recovery_script.py
 
 # Make health endpoint executable
 RUN chmod +x /usr/local/bin/health_endpoint.py
+RUN chmod +x /usr/local/bin/recovery_script.py
 
 # Expose health monitoring port
 EXPOSE 8080
