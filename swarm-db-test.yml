@@ -1,0 +1,63 @@
+# Docker Swarm Database Load Test
+# Deploy this as a temporary service to generate connection chaos
+version: '3.8'
+
+services:
+  db-chaos-test:
+    image: mariadb:latest
+    networks:
+      - radmac_webnet
+    environment:
+      - MARIADB_ROOT_PASSWORD=${MARIADB_ROOT_PASSWORD}
+    command: >
+      bash -c "
+        echo '🧪 Starting Swarm-based database connection chaos test...'
+        echo '📍 Target: db:3306'
+        
+        # Install required tools
+        apt-get update -qq && apt-get install -y curl -qq
+        
+        # Function to create connection chaos
+        create_chaos() {
+          echo '🔥 Creating connection chaos (simulating NFS hiccup)...'
+          for i in {1..50}; do
+            timeout 2 mariadb -h db -u root -p\$${MARIADB_ROOT_PASSWORD} -e 'SELECT SLEEP(10);' &
+          done
+          
+          echo '⏱️  Waiting 5 seconds for connections to build up...'
+          sleep 5
+          
+          echo '💥 Killing connections (simulating network disconnect)...'
+          pkill -f mariadb || echo 'Processes killed'
+          
+          echo '📊 Test completed - check database health endpoint'
+        }
+        
+        # Wait for database to be ready
+        echo '⏳ Waiting for database to be ready...'
+        until mariadb -h db -u root -p\$${MARIADB_ROOT_PASSWORD} -e 'SELECT 1;' >/dev/null 2>&1; do
+          echo 'Waiting for database...'
+          sleep 2
+        done
+        
+        echo '✅ Database is ready, starting chaos test'
+        create_chaos
+        
+        echo '🔍 Checking health endpoint...'
+        curl -s http://db:8080/health || echo 'Health check failed'
+        
+        echo '✅ Chaos test completed! Check watchdog logs for recovery actions.'
+        sleep 10
+      "
+    deploy:
+      restart_policy:
+        condition: none
+      placement:
+        constraints:
+          - node.role == worker
+    depends_on:
+      - db
+
+networks:
+  radmac_webnet:
+    external: true

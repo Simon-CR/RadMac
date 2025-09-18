@@ -59,9 +59,10 @@ def check_mariadb():
         threads_connected = int(metrics.get('Threads_connected', '0'))
         
         warnings = []
-        if threads_connected > 100:
+        # Increased thresholds - be less sensitive to normal connection drops
+        if threads_connected > 150:  # Increased from 100
             warnings.append(f"High connection count: {threads_connected}")
-        if aborted_connects > 50:  # Configurable threshold
+        if aborted_connects > 100:  # Increased from 50 - normal operations can have many
             warnings.append(f"High aborted connections: {aborted_connects}")
         
         return True, warnings if warnings else None

@@ -21,9 +21,17 @@ def init_connection_pool():
                 'pool_name': 'app_pool',
                 'pool_size': 10,
                 'pool_reset_session': True,
-                'connect_timeout': 10,
+                'connect_timeout': 20,  # Increased from 10
                 'charset': 'utf8mb4',
-                'collation': 'utf8mb4_unicode_ci'
+                'collation': 'utf8mb4_unicode_ci',
+                # Additional settings to handle network issues better
+                'connection_timeout': 20,
+                'sql_mode': '',
+                'raise_on_warnings': False,
+                'use_unicode': True,
+                # Network resilience settings
+                'net_read_timeout': 60,
+                'net_write_timeout': 60
             }
             
             _connection_pool = mysql.connector.pooling.MySQLConnectionPool(**db_config)

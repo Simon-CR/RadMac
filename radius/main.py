@@ -6,6 +6,8 @@ import mysql.connector
 from mysql.connector import pooling
 import os
 import traceback
+import logging
+import time
 
 DEFAULT_VLAN_ID = os.getenv("DEFAULT_VLAN", "505")
 DENIED_VLAN = os.getenv("DENIED_VLAN", "999")
@@ -26,9 +28,16 @@ class MacRadiusServer(Server):
                 'pool_name': 'radius_pool',
                 'pool_size': 5,
                 'pool_reset_session': True,
-                'connect_timeout': 10,
+                'connect_timeout': 20,  # Increased from 10
                 'charset': 'utf8mb4',
-                'collation': 'utf8mb4_unicode_ci'
+                'collation': 'utf8mb4_unicode_ci',
+                # Additional network resilience settings
+                'connection_timeout': 20,
+                'sql_mode': '',
+                'raise_on_warnings': False,
+                'use_unicode': True,
+                'net_read_timeout': 60,
+                'net_write_timeout': 60
             }
             
             self.connection_pool = mysql.connector.pooling.MySQLConnectionPool(**self.db_config)
@@ -45,15 +54,37 @@ class MacRadiusServer(Server):
             raise
     
     def get_db_connection(self):
-        """Get a connection from the pool with automatic reconnection"""
-        try:
-            conn = self.connection_pool.get_connection()
-            conn.ping(reconnect=True)
-            return conn
-        except Exception as e:
-            print(f"❌ Database connection error: {e}")
-            traceback.print_exc()
-            raise
+        """Get a database connection from the pool with improved error handling."""
+        max_retries = 3
+        retry_delay = 2
+        
+        for attempt in range(max_retries):
+            try:
+                connection = self.connection_pool.get_connection()
+                if connection.is_connected():
+                    # Ensure connection is in autocommit mode for consistency
+                    connection.autocommit = True
+                    return connection
+                else:
+                    connection.close()
+                    raise mysql.connector.Error("Connection not active")
+            except mysql.connector.Error as e:
+                logging.warning(f"Database connection attempt {attempt + 1} failed: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                    # Try to reset the pool on failure
+                    try:
+                        if hasattr(self, 'connection_pool'):
+                            # Create a new pool connection to test
+                            test_conn = mysql.connector.connect(**self.db_config)
+                            test_conn.close()
+                    except:
+                        pass
+                else:
+                    logging.error(f"Failed to get database connection after {max_retries} attempts")
+                    raise
+        
+        return None
 
     def HandleAuthPacket(self, pkt):
         print(f"\n📡 Received RADIUS Auth Request")
