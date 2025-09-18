@@ -265,8 +265,80 @@ class RadMacWatchdog:
         try:
             if service_name == 'database':
                 logger.info(f"Triggering database recovery for {service_name}")
-                # Execute the database recovery script inside the database container
-                container_name = f"{self.container_prefix}_{service_name}_1"
+                
+                # Try Swarm service exec first, then fall back to container exec
+                recovery_success = False
+                
+                # Method 1: Try Docker Swarm service execution
+                if self._try_swarm_recovery(service_name):
+                    recovery_success = True
+                # Method 2: Fall back to direct container execution  
+                elif self._try_container_recovery(service_name):
+                    recovery_success = True
+                # Method 3: Use HTTP endpoint if available
+                elif self._try_http_recovery(service_name):
+                    recovery_success = True
+                else:
+                    logger.error(f"All recovery methods failed for {service_name}")
+                    
+                if recovery_success:
+                    logger.info(f"Database recovery completed successfully for {service_name}")
+            else:
+                logger.info(f"Recovery action for {service_name} - logging degraded state")
+                warnings = health_data.get('warnings', [])
+                logger.warning(f"Service {service_name} degraded: {', '.join(warnings)}")
+        except Exception as e:
+            logger.error(f"Recovery action failed for {service_name}: {e}")
+
+    def _try_swarm_recovery(self, service_name: str) -> bool:
+        """Try recovery using Docker Swarm service exec"""
+        try:
+            import docker.errors
+            # Look for Swarm service
+            service_full_name = f"{self.container_prefix}_{service_name}"
+            try:
+                services = self.docker_client.services.list(filters={'name': service_full_name})
+                if services:
+                    service = services[0]
+                    # Get service tasks (containers)
+                    tasks = service.tasks(filters={'desired-state': 'running'})
+                    if tasks:
+                        # Execute on the first running task
+                        task = tasks[0]
+                        container_id = task['Status']['ContainerStatus']['ContainerID']
+                        container = self.docker_client.containers.get(container_id)
+                        
+                        exec_result = container.exec_run(
+                            'python3 /usr/local/bin/recovery_script.py',
+                            stdout=True,
+                            stderr=True
+                        )
+                        
+                        if exec_result.exit_code == 0:
+                            logger.info(f"Swarm recovery success: {exec_result.output.decode()}")
+                            return True
+                        else:
+                            logger.warning(f"Swarm recovery failed: {exec_result.output.decode()}")
+                            return False
+            except docker.errors.NotFound:
+                logger.debug(f"No Swarm service found for {service_full_name}")
+                return False
+        except Exception as e:
+            logger.debug(f"Swarm recovery attempt failed: {e}")
+            return False
+
+    def _try_container_recovery(self, service_name: str) -> bool:
+        """Try recovery using direct container execution (Docker Compose)"""
+        try:
+            # Try different container naming conventions
+            possible_names = [
+                f"{self.container_prefix}_{service_name}_1",
+                f"{self.container_prefix}-{service_name}-1", 
+                f"{service_name}",
+                f"db"  # Common alias
+            ]
+            
+            for container_name in possible_names:
                 try:
                     container = self.docker_client.containers.get(container_name)
                     exec_result = container.exec_run(
@@ -274,20 +346,46 @@ class RadMacWatchdog:
                         stdout=True,
                         stderr=True
                     )
+                    
                     if exec_result.exit_code == 0:
-                        logger.info(f"Database recovery completed successfully: {exec_result.output.decode()}")
+                        logger.info(f"Container recovery success: {exec_result.output.decode()}")
+                        return True
                     else:
-                        logger.error(f"Database recovery failed: {exec_result.output.decode()}")
+                        logger.warning(f"Container recovery failed: {exec_result.output.decode()}")
+                        return False
                 except docker.errors.NotFound:
-                    logger.error(f"Container {container_name} not found for recovery")
-                except Exception as e:
-                    logger.error(f"Failed to execute recovery script: {e}")
-            else:
-                logger.info(f"Recovery action for {service_name} - logging degraded state")
-                warnings = health_data.get('warnings', [])
-                logger.warning(f"Service {service_name} degraded: {', '.join(warnings)}")
+                    continue
+            
+            logger.debug(f"No containers found with names: {possible_names}")
+            return False
         except Exception as e:
-            logger.error(f"Recovery action failed for {service_name}: {e}")
+            logger.debug(f"Container recovery attempt failed: {e}")
+            return False
+            
+    def _try_http_recovery(self, service_name: str) -> bool:
+        """Try recovery using HTTP endpoint"""
+        try:
+            if service_name == 'database':
+                # Use the database health endpoint's recovery feature
+                recovery_url = f"http://db:8080/recover"
+                response = requests.post(recovery_url, timeout=30)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    logger.info(f"HTTP recovery success: {data.get('output', 'Recovery completed')}")
+                    return True
+                else:
+                    data = response.json() if response.headers.get('content-type', '').startswith('application/json') else {}
+                    error = data.get('error', f'HTTP {response.status_code}')
+                    logger.warning(f"HTTP recovery failed: {error}")
+                    return False
+            return False
+        except requests.exceptions.RequestException as e:
+            logger.debug(f"HTTP recovery attempt failed: {e}")
+            return False
+        except Exception as e:
+            logger.debug(f"HTTP recovery attempt failed: {e}")
+            return False
 
     def handle_status_change(self, service_name, health_response, actions):
         current_healthy = health_response['healthy']

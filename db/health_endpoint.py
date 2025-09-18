@@ -82,6 +82,13 @@ class HealthHandler(http.server.SimpleHTTPRequestHandler):
         else:
             self.send_response(404)
             self.end_headers()
+    
+    def do_POST(self):
+        if self.path == '/recover':
+            self.trigger_recovery()
+        else:
+            self.send_response(404)
+            self.end_headers()
             
     def health_check(self):
         healthy, error_or_warnings = check_mariadb()
@@ -112,6 +119,49 @@ class HealthHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
         self.wfile.write(json.dumps(response).encode())
+        
+    def trigger_recovery(self):
+        """HTTP endpoint for triggering database recovery"""
+        try:
+            # Execute the recovery script
+            result = subprocess.run([
+                'python3', '/usr/local/bin/recovery_script.py'
+            ], capture_output=True, text=True, timeout=30)
+            
+            response = {
+                "status": "completed" if result.returncode == 0 else "failed",
+                "exit_code": result.returncode,
+                "output": result.stdout,
+                "error": result.stderr if result.returncode != 0 else None,
+                "timestamp": time.time()
+            }
+            
+            status_code = 200 if result.returncode == 0 else 500
+            self.send_response(status_code)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(response).encode())
+            
+        except subprocess.TimeoutExpired:
+            response = {
+                "status": "failed",
+                "error": "Recovery script timed out",
+                "timestamp": time.time()
+            }
+            self.send_response(500)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(response).encode())
+        except Exception as e:
+            response = {
+                "status": "failed", 
+                "error": f"Recovery execution failed: {str(e)}",
+                "timestamp": time.time()
+            }
+            self.send_response(500)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(response).encode())
 
     def log_message(self, format, *args):
         # Suppress default logging
