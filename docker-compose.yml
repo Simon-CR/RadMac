@@ -24,7 +24,7 @@ services:
     networks:
       - webnet
   radius:
-    image: simonclr/radmac-radius:test
+    image: simonclr/radmac-radius:latest
     depends_on:
       - db
     env_file:
