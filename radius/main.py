@@ -35,9 +35,7 @@ class MacRadiusServer(Server):
                 'connection_timeout': 20,
                 'sql_mode': '',
                 'raise_on_warnings': False,
-                'use_unicode': True,
-                'net_read_timeout': 60,
-                'net_write_timeout': 60
+                'use_unicode': True
             }
             
             self.connection_pool = mysql.connector.pooling.MySQLConnectionPool(**self.db_config)
