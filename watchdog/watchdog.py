@@ -468,12 +468,14 @@ class RadMacWatchdog:
                     app_health = self.check_health(self.services['app']['health_url'])
                     if app_health:
                         self.handle_status_change('app', app_health, self.services['app']['actions'])
+                        if app_health['healthy']:
+                            self.restart_attempts.clear()
                     else:
                         logger.error("No health response for app")
-                    if app_health and app_health['healthy']:
-                        self.restart_attempts.clear()
+                        app_health = None  # Ensure it's None for other service checks
                 except Exception as e:
                     logger.error(f"Watchdog error for app: {e}")
+                    app_health = None  # Ensure it's None on error
                 next_check['app'] = now + self.services['app']['interval']
             # Now check other services
             for name, svc in self.services.items():
@@ -498,10 +500,10 @@ class RadMacWatchdog:
                             health_response = self.check_health(svc['health_url'])
                             if health_response:
                                 self.handle_status_change(name, health_response, svc['actions'])
+                                if health_response['healthy']:
+                                    self.restart_attempts.clear()
                             else:
                                 logger.error(f"No health response for {name}")
-                            if health_response and health_response['healthy']:
-                                self.restart_attempts.clear()
                         except Exception as e:
                             logger.error(f"Watchdog error for {name}: {e}")
                     next_check[name] = now + svc['interval']

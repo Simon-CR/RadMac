@@ -1,34 +1,43 @@
-# RadMac Watchdog Configuration - Docker Swarm Example
-# This configuration omits restart actions for Docker Swarm deployments
-#
-# ------------------------------------------------------------------------------
-# CONFIG VERSIONING
-# ------------------------------------------------------------------------------
-version: 1.2.2
+# RadMac Watchdog Configuration - Docker Swarm Optimized
+# Use this configuration for Docker Swarm deployments
+version: 1.2.4
 
-# ------------------------------------------------------------------------------
-# DEPLOYMENT NOTE  
-# ------------------------------------------------------------------------------
-# For Docker Swarm: Omit 'restart' action, let Swarm handle auto-recovery
-# For single-host Docker Compose: Add 'restart' action for automatic recovery
-
-# RadMac Watchdog Service Configuration
+# Docker Swarm Service Configuration
+# NOTE: 'restart' action is DISABLED for Swarm as Swarm handles auto-recovery
+# 'recover' action uses HTTP endpoints for cross-node compatibility
 services:
   app:
     health_url: http://app:8080/health
     interval_env: WATCHDOG_CHECK_INTERVAL_APP
     default_interval: 30
-    actions: [log, email, discord, pushbullet, slack, teams, telegram, webhook]
+    # Swarm-optimized actions: log + recover + notifications (NO restart)
+    actions: [log, recover, email, slack, webhook]
   database:
     health_url: http://db:8080/health
     interval_env: WATCHDOG_CHECK_INTERVAL_DATABASE
     default_interval: 30
-    actions: [log, email, slack, webhook]
+    # Database gets 'recover' for connection cleanup during NFS hiccups
+    actions: [log, recover, email, slack, webhook, telegram]
   radius:
     health_url: http://radius:8080/health
     interval_env: WATCHDOG_CHECK_INTERVAL_RADIUS
     default_interval: 30
-    actions: [log, telegram, webhook]
+    # RADIUS typically needs immediate attention
+    actions: [log, recover, email, slack, telegram, webhook]
+
+# Swarm-Specific Action Strategy:
+#   log      - Monitor health status changes and recovery actions
+#   recover  - Execute service-specific recovery (HTTP-based for cross-node)
+#   email    - Critical alerts for unhealthy services
+#   slack    - Team notifications for degraded/unhealthy status
+#   telegram - Immediate alerts for RADIUS issues
+#   webhook  - Integration with monitoring systems (PagerDuty, etc.)
+#
+# Actions NOT used in Swarm:
+#   restart     - Swarm auto-restarts unhealthy services
+#   discord     - Not typically used for production ops
+#   teams       - Optional, add if you use Microsoft Teams
+#   pushbullet  - Personal notifications not needed for Swarm
 
 # Supported actions:
 #   log        - Log to stdout or file

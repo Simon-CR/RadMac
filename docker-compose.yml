@@ -92,4 +92,5 @@ volumes:
 
 networks:
   webnet:
-    name: webnet
+    driver: overlay
+    attachable: true
