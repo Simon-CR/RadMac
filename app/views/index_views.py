@@ -77,71 +77,13 @@ def test_radius():
         radius_port = current_app.config.get('RADIUS_PORT', 1812)
         radius_secret = current_app.config.get('RADIUS_SECRET', 'testing123')
 
-        # Create a RADIUS client
-        # We need to find or create a dictionary file
+        # Use the existing dictionary file from the radius service
         dict_path = os.path.join(os.path.dirname(__file__), '../../radius/dictionary')
+        
         if not os.path.exists(dict_path):
-            # Fallback to creating a minimal dictionary in memory
-            dict_path = '/tmp/radius_dict'
-            with open(dict_path, 'w') as f:
-                f.write("""
-ATTRIBUTE User-Name 1 string
-ATTRIBUTE User-Password 2 string
-ATTRIBUTE NAS-IP-Address 4 ipaddr
-ATTRIBUTE NAS-Port 5 integer
-ATTRIBUTE Service-Type 6 integer
-ATTRIBUTE Framed-Protocol 7 integer
-ATTRIBUTE Framed-IP-Address 8 ipaddr
-ATTRIBUTE Framed-IP-Netmask 9 ipaddr
-ATTRIBUTE Framed-Routing 10 integer
-ATTRIBUTE Filter-Id 11 string
-ATTRIBUTE Framed-MTU 12 integer
-ATTRIBUTE Framed-Compression 13 integer
-ATTRIBUTE Reply-Message 18 string
-ATTRIBUTE State 24 octets
-ATTRIBUTE Class 25 octets
-ATTRIBUTE Vendor-Specific 26 octets
-ATTRIBUTE Session-Timeout 27 integer
-ATTRIBUTE Idle-Timeout 28 integer
-ATTRIBUTE Termination-Action 29 integer
-ATTRIBUTE Called-Station-Id 30 string
-ATTRIBUTE Calling-Station-Id 31 string
-ATTRIBUTE NAS-Identifier 32 string
-ATTRIBUTE Proxy-State 33 octets
-ATTRIBUTE Acct-Status-Type 40 integer
-ATTRIBUTE Acct-Delay-Time 41 integer
-ATTRIBUTE Acct-Input-Octets 42 integer
-ATTRIBUTE Acct-Output-Octets 43 integer
-ATTRIBUTE Acct-Session-Id 44 string
-ATTRIBUTE Acct-Authentic 45 integer
-ATTRIBUTE Acct-Session-Time 46 integer
-ATTRIBUTE Acct-Input-Packets 47 integer
-ATTRIBUTE Acct-Output-Packets 48 integer
-ATTRIBUTE Acct-Terminate-Cause 49 integer
-ATTRIBUTE Event-Timestamp 55 integer
-ATTRIBUTE Tunnel-Type 64 integer
-ATTRIBUTE Tunnel-Medium-Type 65 integer
-ATTRIBUTE Tunnel-Private-Group-Id 81 string
-ATTRIBUTE NAS-Port-Type 61 integer
-ATTRIBUTE Port-Limit 62 integer
+            return jsonify({"error": "RADIUS dictionary file not found"}), 500
 
-VALUE Service-Type Login-User 1
-VALUE Service-Type Framed-User 2
-VALUE Service-Type Callback-Login-User 3
-VALUE Service-Type Callback-Framed-User 4
-VALUE Service-Type Outbound-User 5
-VALUE Service-Type Administrative-User 6
-VALUE Service-Type NAS-Prompt-User 7
-VALUE Service-Type Authenticate-Only 8
-VALUE Service-Type Callback-NAS-Prompt 9
-
-VALUE Framed-Protocol PPP 1
-VALUE Framed-Protocol SLIP 2
-
-VALUE Tunnel-Type VLAN 13
-VALUE Tunnel-Medium-Type IEEE-802 6
-""")
-
+        # Create a RADIUS client
         srv = Client(server=radius_host, 
                     secret=radius_secret.encode(),
                     dict=Dictionary(dict_path))
