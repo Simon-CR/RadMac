@@ -8,6 +8,7 @@ import os
 import traceback
 import logging
 import time
+from pathlib import Path
 
 DEFAULT_VLAN_ID = os.getenv("DEFAULT_VLAN", "505")
 DENIED_VLAN = os.getenv("DENIED_VLAN", "999")
@@ -165,9 +166,49 @@ class MacRadiusServer(Server):
                 except:
                     pass
 
+def resolve_dictionary_path():
+    """Resolve the RADIUS dictionary path across Docker/local environments."""
+    candidates = []
+
+    env_path = os.getenv("RADIUS_DICTIONARY_PATH")
+    if env_path:
+        candidates.append(Path(env_path))
+
+    script_dir = Path(__file__).resolve().parent
+    candidates.extend([
+        script_dir / "dictionary",
+        script_dir / "radius" / "dictionary",
+        Path("/app/dictionary"),
+        Path("/app/radius/dictionary")
+    ])
+
+    # Walk the script directory to find any file literally named "dictionary"
+    for root, _, files in os.walk(script_dir):
+        if "dictionary" in files:
+            candidates.append(Path(root) / "dictionary")
+
+    seen = set()
+    for candidate in candidates:
+        if not candidate:
+            continue
+        candidate = candidate.resolve()
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if candidate.is_file():
+            print(f"📚 Using RADIUS dictionary at: {candidate}")
+            return str(candidate)
+
+    raise FileNotFoundError(
+        "RADIUS dictionary file not found in expected locations. "
+        "Set RADIUS_DICTIONARY_PATH to override."
+    )
+
+
 if __name__ == '__main__':
     print("🚀 Starting MacRadiusServer...")
-    srv = MacRadiusServer(dict=Dictionary("dictionary"))
+    dictionary_path = resolve_dictionary_path()
+    srv = MacRadiusServer(dict=Dictionary(dictionary_path))
     srv.hosts["0.0.0.0"] = RemoteHost("0.0.0.0", os.getenv("RADIUS_SECRET", "testing123").encode(), "localhost")
     print("📡 Listening on 0.0.0.0 for incoming RADIUS requests...")
     srv.BindToAddress("0.0.0.0")

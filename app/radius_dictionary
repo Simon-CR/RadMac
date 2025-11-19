@@ -1,0 +1,8 @@
+ATTRIBUTE   User-Name                       1   string
+ATTRIBUTE   User-Password                   2   string
+ATTRIBUTE   Tunnel-Type                    64   integer
+ATTRIBUTE   Tunnel-Medium-Type             65   integer
+ATTRIBUTE   Tunnel-Private-Group-Id        81   string
+
+VALUE       Tunnel-Type                    VLAN    13
+VALUE       Tunnel-Medium-Type             IEEE-802 6

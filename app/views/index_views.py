@@ -77,11 +77,17 @@ def test_radius():
         radius_port = current_app.config.get('RADIUS_PORT', 1812)
         radius_secret = current_app.config.get('RADIUS_SECRET', 'testing123')
 
-        # Use the existing dictionary file from the radius service
-        dict_path = os.path.join(os.path.dirname(__file__), '../../radius/dictionary')
-        
+        # Resolve dictionary file path (allow override via env/config)
+        dict_path = (current_app.config.get('RADIUS_DICTIONARY_PATH') or
+                     os.getenv('RADIUS_DICTIONARY_PATH'))
+        if not dict_path:
+            dict_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../radius_dictionary'))
+
         if not os.path.exists(dict_path):
-            return jsonify({"error": "RADIUS dictionary file not found"}), 500
+            return jsonify({
+                "error": "RADIUS dictionary file not found",
+                "output": f"Checked path: {dict_path}. Set RADIUS_DICTIONARY_PATH to override."
+            }), 500
 
         # Create a RADIUS client
         srv = Client(server=radius_host, 
