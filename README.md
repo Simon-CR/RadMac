@@ -109,6 +109,12 @@ curl -i http://localhost:8083/health   # Radius
 ## 📝 Changelog
 
 
+### v1.3.0 (2025-11-19)
+- Added a **RADIUS Test** button in the web UI so operators can validate MAC auth flows directly from RadMac.
+- Bundled a minimal RADIUS dictionary with the Flask app and added an override (`RADIUS_DICTIONARY_PATH`) so the test endpoint always has access to the necessary attributes.
+- Enhanced the bundled RADIUS service to autodetect its dictionary inside Docker/Swarm deployments and log the path it uses, preventing false "dictionary not found" failures.
+- Published refreshed multi-arch Docker images (`radmac-app` and `radmac-radius`) containing these updates and the new troubleshooting UX.
+
 ### v1.2.1 (2025-09-02)
 - Added direct `/health` endpoints to db and radius containers for robust, independent health monitoring
 - Updated Dockerfiles to run both main service and health endpoint via supervisord
