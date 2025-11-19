@@ -1,0 +1,471 @@
+{% extends 'base.html' %}
+{% block title %}Monitoring{% endblock %}
+
+{% block content %}
+<div class="monitoring-page">
+  <h1>Monitoring &amp; Alerts</h1>
+  <p class="page-subtitle">
+    Configure health checks, cadence, and delivery targets. Every check tracks DNS, IP discovery, ICMP reachability, and the service-provided result.
+  </p>
+
+  {% set total_checks = checks|length %}
+  {% set enabled_checks = checks|selectattr('enabled')|list|length %}
+  {% set failing_checks = checks|selectattr('service_status', 'equalto', 'fail')|list|length %}
+  {% set destinations_count = destinations|length %}
+
+  <div class="monitoring-overview">
+    <article class="overview-card">
+      <span class="overview-label">Total Checks</span>
+      <strong>{{ total_checks }}</strong>
+      <small>{{ enabled_checks }} enabled · {{ total_checks - enabled_checks }} paused</small>
+    </article>
+    <article class="overview-card {{ 'alert' if failing_checks else '' }}">
+      <span class="overview-label">Failing Checks</span>
+      <strong>{{ failing_checks }}</strong>
+      <small>Run tests to validate fixes</small>
+    </article>
+    <article class="overview-card">
+      <span class="overview-label">Destinations</span>
+      <strong>{{ destinations_count }}</strong>
+      <small>Channels receiving alerts</small>
+    </article>
+    <article class="overview-card">
+      <span class="overview-label">Run Controls</span>
+      <strong>Manual</strong>
+      <small>Checks run automatically + on demand</small>
+    </article>
+  </div>
+
+  <div class="monitoring-toolbar">
+    <div class="toolbar-group">
+      <a href="#smtp-defaults" class="pill-link">SMTP Defaults</a>
+      <a href="#checks" class="pill-link">Service Checks</a>
+      <a href="#destinations" class="pill-link">Destinations</a>
+    </div>
+    <div class="toolbar-group toolbar-filters">
+      <label class="search-field">
+        <span>Filter checks</span>
+        <input type="search" id="check-filter" placeholder="Search by name, host, or type">
+      </label>
+      <label class="switch compact" title="Show enabled checks only">
+        <input type="checkbox" id="filter-enabled">
+        <span>Enabled only</span>
+      </label>
+      <label class="status-select">
+        <span>Status</span>
+        <select id="status-filter">
+          <option value="">All</option>
+          <option value="ok">OK</option>
+          <option value="fail">Fail</option>
+          <option value="unknown">Unknown</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <section class="smtp-settings" id="smtp-defaults">
+    <div class="section-heading">
+      <div>
+        <h2>Email / SMTP Defaults</h2>
+        <p class="muted">Shared envelope + auth settings. Override per destination only when needed.</p>
+      </div>
+    </div>
+    <div class="destination-card">
+      <form method="post" action="{{ url_for('monitoring.update_smtp_settings_route') }}">
+        <div class="two-col">
+          <label>
+            SMTP Host
+            <input type="text" name="smtp_host" value="{{ smtp_settings.host or '' }}" placeholder="smtp.example.com">
+          </label>
+          <label>
+            SMTP Port
+            <input type="number" name="smtp_port" value="{{ smtp_settings.port or 587 }}" min="1">
+          </label>
+        </div>
+        <div class="two-col">
+          <label>
+            Username
+            <input type="text" name="smtp_username" value="{{ smtp_settings.username or '' }}">
+          </label>
+          <label>
+            From Email
+            <input type="email" name="smtp_from_email" value="{{ smtp_settings.from_email or '' }}" placeholder="alerts@example.com">
+          </label>
+        </div>
+        <label>
+          Password (leave blank to keep current)
+          <input type="password" name="smtp_password" autocomplete="new-password">
+        </label>
+        <div class="two-col smtp-security-row">
+          {% set tls_enabled = smtp_settings.use_tls %}
+          {% if tls_enabled is none %}
+            {% set tls_enabled = true %}
+          {% endif %}
+          {% set ssl_enabled = smtp_settings.use_ssl %}
+          <label class="switch">
+            <input type="checkbox" name="smtp_use_tls" value="on" {% if tls_enabled %}checked{% endif %}>
+            <span>Use STARTTLS</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" name="smtp_use_ssl" value="on" {% if ssl_enabled %}checked{% endif %}>
+            <span>Use SSL</span>
+          </label>
+        </div>
+        <button type="submit" class="btn">Save SMTP Settings</button>
+      </form>
+      <form method="post" action="{{ url_for('monitoring.test_smtp_defaults') }}" class="smtp-test-form">
+        <label>
+          Send Test Email
+          <input type="email" name="test_recipient" placeholder="alerts@example.com" required>
+        </label>
+        <button type="submit" class="btn tertiary">Send Test</button>
+      </form>
+    </div>
+  </section>
+
+  <div class="monitor-grid" id="checks">
+    {% for check in checks %}
+    {% set details = check.details or {} %}
+    {% if details is mapping %}
+      {% set detail_dict = details %}
+    {% else %}
+      {% set detail_dict = {} %}
+    {% endif %}
+  <div class="monitor-card" data-service="{{ check.service_name }}" data-status="{{ check.service_status or 'unknown' }}" data-enabled="{{ 'true' if check.enabled else 'false' }}" data-search="{{ ((check.display_name or '') ~ ' ' ~ (check.host or '') ~ ' ' ~ (check.check_type or ''))|lower }}">
+      <header>
+        <div>
+          <h2>{{ check.display_name }}</h2>
+          <p class="muted check-meta">{{ check.check_type|title }} • Host {{ check.host }} • Every {{ check.interval_seconds }}s • Last run {{ check.last_run or 'never' }}</p>
+        </div>
+        <div class="card-actions">
+          <form method="post" action="{{ url_for('monitoring.save_check_settings', service_name=check.service_name) }}" class="inline-toggle">
+            <label class="switch compact">
+              <input type="checkbox" name="enabled" {% if check.enabled %}checked{% endif %}>
+              <span>Enabled</span>
+            </label>
+            <button type="submit" class="btn secondary">Save</button>
+          </form>
+          <button class="btn" data-run-check="{{ check.service_name }}">Run Test</button>
+        </div>
+      </header>
+
+      <div class="status-grid">
+        <div class="status-block">
+          <strong>Name Resolution</strong>
+          <span class="status-pill {{ check.dns_status or 'unknown' }}" data-role="dns-status">{{ check.dns_status or 'unknown' }}</span>
+          <small data-role="dns-note">{{ detail_dict.dns_notes or '' }}</small>
+        </div>
+        <div class="status-block">
+          <strong>Discovered IP</strong>
+          <span data-role="resolved-ip">{{ check.resolved_ip or 'not available' }}</span>
+          {% if detail_dict.ip_list %}<small>{{ detail_dict.ip_list|join(', ') }}</small>{% endif %}
+        </div>
+        <div class="status-block">
+          <strong>Ping</strong>
+          {% set ping_state = (check.ping_status or 'unknown') %}
+          <span class="status-pill ping-pill {{ ping_state }}" data-role="ping-status" data-state="{{ ping_state }}">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span class="status-label">
+              {% if ping_state == 'ok' %}Reachable{% elif ping_state == 'fail' %}Down{% else %}Unknown{% endif %}
+            </span>
+          </span>
+        </div>
+        <div class="status-block">
+          <strong>Service</strong>
+          <span class="status-pill {{ check.service_status or 'unknown' }}" data-role="service-status">{{ check.service_status or 'unknown' }}</span>
+          <small data-role="service-details">{{ detail_dict.service_details or '' }}</small>
+        </div>
+      </div>
+
+      <details class="settings">
+        <summary>Advanced Settings</summary>
+        <form method="post" action="{{ url_for('monitoring.save_check_settings', service_name=check.service_name) }}">
+          <fieldset>
+            <legend>Cadence</legend>
+            <div class="two-col">
+              <label>
+                Frequency (seconds)
+                <input type="number" name="interval_seconds" value="{{ check.interval_seconds }}" min="15" required>
+              </label>
+              <label>
+                Startup Delay (seconds)
+                <input type="number" name="startup_delay_seconds" value="{{ check.startup_delay_seconds }}" min="0" required>
+              </label>
+            </div>
+            <label class="switch">
+              <input type="checkbox" name="enabled" {% if check.enabled %}checked{% endif %}>
+              <span>Enabled</span>
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Actions</legend>
+            <p class="muted">Choose which notifiers fire when this check fails.</p>
+            <div class="actions-grid">
+              {% for action in ['log','webhook','email','slack','teams','discord','telegram','pushbullet','recover','restart'] %}
+              <label>
+                <input type="checkbox" name="actions" value="{{ action }}" {% if action in check.actions %}checked{% endif %}>
+                {{ action|title }}
+              </label>
+              {% endfor %}
+            </div>
+          </fieldset>
+
+          <fieldset class="alert-note">
+            <legend>Alert Routing</legend>
+            <p class="muted">All enabled destinations receive alerts for this check. Manage them below if you need to enable/disable channels.</p>
+          </fieldset>
+
+          <button type="submit" class="btn secondary">Save Settings</button>
+        </form>
+      </details>
+
+      <pre class="check-output" data-role="output"></pre>
+    </div>
+    {% endfor %}
+  </div>
+
+  <p class="muted" data-no-results hidden>No checks match your filter.</p>
+
+  <section class="destinations-section" id="destinations">
+    <div class="section-heading">
+      <div>
+        <h2>Alert Destinations</h2>
+        <p class="muted">Everything below is global: every enabled destination receives every alert. Use the test button to validate connectivity.</p>
+      </div>
+      <button type="button" class="btn" data-open-destination-modal>Add Destination</button>
+    </div>
+    <div class="destinations-grid">
+      <div class="destination-list">
+        {% for dest in destinations %}
+        {% set cfg = dest.config or {} %}
+        <div class="destination-card" data-destination-card>
+          <div class="destination-card-header">
+            <div>
+              <strong>{{ dest.name }}</strong>
+              <span class="badge">{{ dest.destination_type }}</span>
+              <span class="status-pill {{ 'ok' if dest.enabled else 'unknown' }}">{{ 'enabled' if dest.enabled else 'disabled' }}</span>
+            </div>
+            <div class="destination-card-quick">
+              <form method="post" action="{{ url_for('monitoring.test_destination', destination_id=dest.id) }}" class="inline-test">
+                <button type="submit" class="btn tertiary">Send Test</button>
+              </form>
+              <form method="post" action="{{ url_for('monitoring.remove_destination', destination_id=dest.id) }}" onsubmit="return confirm('Remove {{ dest.name }}?')" class="inline-delete">
+                <button type="submit" class="btn danger">Delete</button>
+              </form>
+              <button type="button" class="btn secondary" data-toggle-destination>Configure</button>
+            </div>
+          </div>
+          <div class="destination-card-body" hidden>
+            <form method="post" action="{{ url_for('monitoring.edit_destination', destination_id=dest.id) }}">
+              <label>Name<input type="text" name="name" value="{{ dest.name }}" required></label>
+              <label>Type
+                <select name="destination_type">
+                  {% for kind in destination_types %}
+                  <option value="{{ kind }}" {% if kind == dest.destination_type %}selected{% endif %}>{{ kind|title }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label class="switch">
+                <input type="checkbox" name="enabled" {% if dest.enabled %}checked{% endif %}>
+                <span>Enabled</span>
+              </label>
+              <label>Webhook URL<input type="text" name="webhook_url" value="{{ cfg.get('webhook_url','') }}"></label>
+              <label>Email To<input type="email" name="email_to" value="{{ cfg.get('email_to','') }}"></label>
+              <label>Email From<input type="email" name="email_from" value="{{ cfg.get('email_from','') }}"></label>
+              <label>SMTP Host<input type="text" name="smtp_host" value="{{ cfg.get('smtp_host','') }}"></label>
+              <label>SMTP Port<input type="number" name="smtp_port" value="{{ cfg.get('smtp_port','') }}"></label>
+              <label>SMTP User<input type="text" name="smtp_user" value="{{ cfg.get('smtp_user','') }}"></label>
+              <label>SMTP Password<input type="password" name="smtp_password" value="{{ cfg.get('smtp_password','') }}"></label>
+              <label>Telegram Bot Token<input type="text" name="telegram_bot_token" value="{{ cfg.get('telegram_bot_token','') }}"></label>
+              <label>Telegram Chat ID<input type="text" name="telegram_chat_id" value="{{ cfg.get('telegram_chat_id','') }}"></label>
+              <label>Pushbullet Token<input type="text" name="pushbullet_token" value="{{ cfg.get('pushbullet_token','') }}"></label>
+              <label>Pushbullet Device<input type="text" name="pushbullet_device" value="{{ cfg.get('pushbullet_device','') }}"></label>
+              <label>Headers JSON<textarea name="headers_json" rows="2">{{ cfg.get('headers_json','') }}</textarea></label>
+              <label>Extra Payload<textarea name="extra_payload" rows="2">{{ cfg.get('extra_payload','') }}</textarea></label>
+              <label>Config JSON Override<textarea name="config_json_raw" rows="3">{{ dest.config_json }}</textarea></label>
+              <button type="submit" class="btn secondary">Update</button>
+            </form>
+          </div>
+        </div>
+        {% else %}
+        <p>No destinations configured yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="modal monitoring-modal" id="destination-modal" aria-hidden="true">
+  <div class="modal-overlay" data-close-modal></div>
+  <div class="modal-content">
+    <header class="modal-header">
+      <h3>Create Destination</h3>
+      <button type="button" class="modal-close" data-close-modal>&times;</button>
+    </header>
+    <p class="muted">Provide the basics, then fill only the overrides you need.</p>
+    <form method="post" action="{{ url_for('monitoring.create_destination') }}">
+      <label>Name<input type="text" name="name" required></label>
+      <label>Type
+        <select name="destination_type" required>
+          <option value="">Select type</option>
+          {% for kind in destination_types %}
+          <option value="{{ kind }}">{{ kind|title }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="switch">
+        <input type="checkbox" name="enabled" checked>
+        <span>Enabled</span>
+      </label>
+      <label>Webhook URL<input type="text" name="webhook_url"></label>
+      <label>Email To<input type="email" name="email_to"></label>
+      <label>Email From<input type="email" name="email_from"></label>
+      <label>SMTP Host<input type="text" name="smtp_host"></label>
+      <label>SMTP Port<input type="number" name="smtp_port" value="587"></label>
+      <label>SMTP User<input type="text" name="smtp_user"></label>
+      <label>SMTP Password<input type="password" name="smtp_password"></label>
+      <label>Telegram Bot Token<input type="text" name="telegram_bot_token"></label>
+      <label>Telegram Chat ID<input type="text" name="telegram_chat_id"></label>
+      <label>Pushbullet Token<input type="text" name="pushbullet_token"></label>
+      <label>Pushbullet Device<input type="text" name="pushbullet_device"></label>
+      <label>Headers JSON<textarea name="headers_json" rows="2"></textarea></label>
+      <label>Extra Payload<textarea name="extra_payload" rows="2"></textarea></label>
+      <label>Config JSON Override<textarea name="config_json_raw" rows="3" placeholder='{"custom":"value"}'></textarea></label>
+      <div class="modal-actions">
+        <button type="button" class="btn secondary" data-close-modal>Cancel</button>
+        <button type="submit" class="btn">Create Destination</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  const labelFromStatus = (status) => {
+    if (status === 'ok') return 'Reachable';
+    if (status === 'fail') return 'Down';
+    return 'Unknown';
+  };
+
+  const updatePill = (el, status) => {
+    if (!el) return;
+    const value = (status || 'unknown').toLowerCase();
+    el.className = `status-pill ${value}`;
+    if (el.dataset.role === 'ping-status') {
+      el.classList.add('ping-pill');
+      const label = el.querySelector('.status-label');
+      if (label) label.textContent = labelFromStatus(value);
+    } else {
+      el.textContent = value;
+    }
+  };
+
+  const cards = Array.from(document.querySelectorAll('.monitor-card'));
+  const filterInput = document.getElementById('check-filter');
+  const enabledToggle = document.getElementById('filter-enabled');
+  const statusSelect = document.getElementById('status-filter');
+
+  const applyCheckFilters = () => {
+    const query = (filterInput?.value || '').toLowerCase();
+    const enabledOnly = enabledToggle?.checked;
+    const status = (statusSelect?.value || '').toLowerCase();
+    let visibleCount = 0;
+
+    cards.forEach((card) => {
+      const matchesQuery = !query || (card.dataset.search || '').includes(query);
+      const matchesEnabled = !enabledOnly || card.dataset.enabled === 'true';
+      const matchesStatus = !status || (card.dataset.status || 'unknown') === status;
+      const show = matchesQuery && matchesEnabled && matchesStatus;
+      card.style.display = show ? '' : 'none';
+      if (show) visibleCount += 1;
+    });
+
+    const emptyState = document.querySelector('[data-no-results]');
+    if (emptyState) {
+      emptyState.hidden = visibleCount !== 0;
+    }
+  };
+
+  filterInput?.addEventListener('input', applyCheckFilters);
+  enabledToggle?.addEventListener('change', applyCheckFilters);
+  statusSelect?.addEventListener('change', applyCheckFilters);
+  applyCheckFilters();
+
+  document.querySelectorAll('[data-run-check]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const service = button.dataset.runCheck;
+      const card = button.closest('.monitor-card');
+      const output = card.querySelector('[data-role="output"]');
+      output.textContent = 'Running test...';
+      fetch(`/monitoring/checks/${service}/run`, { method: 'POST' })
+        .then((resp) => resp.json().then((data) => ({ ok: resp.ok, data })))
+        .then(({ ok, data }) => {
+          if (!ok) {
+            output.textContent = data.error || 'Test failed';
+            return;
+          }
+          output.textContent = `DNS: ${data.dns_status}\nPing: ${data.ping_status}\nService: ${data.service_status}\n${data.service_details || ''}`;
+          updatePill(card.querySelector('[data-role="dns-status"]'), data.dns_status);
+          updatePill(card.querySelector('[data-role="ping-status"]'), data.ping_status);
+          updatePill(card.querySelector('[data-role="service-status"]'), data.service_status);
+          const dnsNote = card.querySelector('[data-role="dns-note"]');
+          if (dnsNote) dnsNote.textContent = data.dns_notes || '';
+          const pingDetails = card.querySelector('[data-role="ping-details"]');
+          if (pingDetails) pingDetails.textContent = data.ping_details || '';
+          card.querySelector('[data-role="service-details"]').textContent = data.service_details || '';
+          card.querySelector('[data-role="resolved-ip"]').textContent = data.resolved_ip || 'not available';
+        })
+        .catch((err) => {
+          output.textContent = `Error: ${err}`;
+        });
+    });
+  });
+
+  document.querySelectorAll('[data-destination-card]').forEach((card) => {
+    const toggleButton = card.querySelector('[data-toggle-destination]');
+    const body = card.querySelector('.destination-card-body');
+    if (!toggleButton || !body) return;
+    toggleButton.addEventListener('click', () => {
+      const isHidden = body.hasAttribute('hidden');
+      if (isHidden) {
+        body.removeAttribute('hidden');
+        toggleButton.textContent = 'Hide details';
+      } else {
+        body.setAttribute('hidden', '');
+        toggleButton.textContent = 'Configure';
+      }
+    });
+  });
+
+  const destinationModal = document.getElementById('destination-modal');
+  const setModalVisible = (isVisible) => {
+    if (!destinationModal) return;
+    destinationModal.setAttribute('aria-hidden', isVisible ? 'false' : 'true');
+    document.body.classList.toggle('modal-open', isVisible);
+    if (isVisible) {
+      const form = destinationModal.querySelector('form');
+      form?.reset();
+    }
+  };
+
+  document.querySelectorAll('[data-open-destination-modal]').forEach((button) => {
+    button.addEventListener('click', () => setModalVisible(true));
+  });
+
+  destinationModal?.querySelectorAll('[data-close-modal]').forEach((button) => {
+    button.addEventListener('click', () => setModalVisible(false));
+  });
+
+  destinationModal?.addEventListener('click', (event) => {
+    if (event.target?.dataset?.closeModal !== undefined) {
+      setModalVisible(false);
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && destinationModal?.getAttribute('aria-hidden') === 'false') {
+      setModalVisible(false);
+    }
+  });
+</script>
+{% endblock %}

@@ -10,8 +10,9 @@ import time
 import json
 import logging
 import requests
-import docker
-import yaml
+import smtplib
+import importlib
+from email.message import EmailMessage
 from datetime import datetime
 from typing import Dict, Any, Optional
 
@@ -27,9 +28,26 @@ class RadMacWatchdog:
     def __init__(self, config_path='watchdog_config.yaml'):
         self.config_path = config_path
         self.services = {}
+        self.service_destinations = {}
+        self.next_check = {}
+        self.service_ready_at = {}
+        self.smtp_settings = {}
         self.last_status = {}
         self.restart_attempts = {}
         self.docker_client = None
+        self.docker_module = None
+        self.docker_errors = None
+        self.api_config_url = os.getenv('WATCHDOG_CONFIG_API_URL')
+        self.api_token = os.getenv('WATCHDOG_CONFIG_API_TOKEN')
+        try:
+            refresh_env = os.getenv('WATCHDOG_CONFIG_REFRESH_SECONDS', '120')
+            if refresh_env.startswith('{') and refresh_env.endswith('}'):
+                self.api_refresh_interval = 120
+            else:
+                self.api_refresh_interval = max(30, int(refresh_env))
+        except (TypeError, ValueError):
+            self.api_refresh_interval = 120
+        self.next_config_refresh = 0
         
         # Parse max restart attempts with error handling
         try:
@@ -44,16 +62,46 @@ class RadMacWatchdog:
             self.max_restart_attempts = 3
         self.container_prefix = os.getenv('WATCHDOG_CONTAINER_PREFIX', 'radmac')
         self.load_config()
+        self._sync_tracking_maps(time.time(), reset=True)
+        if self.api_config_url:
+            self.refresh_from_api(initial=True)
         self.init_docker()
         logger.info("RadMac Watchdog initialized with services:")
         for name, svc in self.services.items():
             logger.info(f"  {name}: {svc['health_url']} (interval: {svc['interval']}s, actions: {svc['actions']})")
 
+    def _normalize_actions(self, actions):
+        if not actions:
+            return ['log']
+        if isinstance(actions, str):
+            try:
+                parsed = json.loads(actions)
+                if isinstance(parsed, list):
+                    return parsed
+            except (ValueError, TypeError):
+                return [a.strip() for a in actions.split(',') if a.strip()]
+        return actions
+
+    def _to_int(self, value, default):
+        try:
+            if value is None:
+                return default
+            if isinstance(value, str) and not value.strip():
+                return default
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
     def load_config(self):
         # Load YAML config
+        try:
+            yaml = importlib.import_module('yaml')
+        except ImportError as exc:
+            raise RuntimeError("PyYAML is required to load the watchdog configuration") from exc
         with open(self.config_path, 'r') as f:
             config = yaml.safe_load(f)
         self.services = {}
+        self.service_destinations = {}
         for name, svc in config.get('services', {}).items():
             # Parse interval with error handling
             interval_env_var = svc.get('interval_env', '')
@@ -70,23 +118,134 @@ class RadMacWatchdog:
                 logger.warning(f"Invalid interval value for {name}: {os.getenv(interval_env_var)}, using default ({default_interval})")
                 interval = default_interval
                 
-            actions = svc.get('actions', ['log'])
+            actions = self._normalize_actions(svc.get('actions', ['log']))
+            startup_delay = self._to_int(svc.get('startup_delay_seconds'), 0)
             self.services[name] = {
                 'health_url': svc['health_url'],
                 'interval': interval,
-                'actions': actions
+                'actions': actions,
+                'startup_delay': startup_delay
             }
+            self.service_destinations[name] = []
+        self._sync_tracking_maps(time.time(), reset=True)
+
+    def _sync_tracking_maps(self, current_time=None, reset=False):
+        if current_time is None:
+            current_time = time.time()
+        if reset:
+            self.next_check = {}
+            self.service_ready_at = {}
+        # Remove stale entries
+        for name in list(self.next_check.keys()):
+            if name not in self.services:
+                self.next_check.pop(name, None)
+        for name in list(self.service_ready_at.keys()):
+            if name not in self.services:
+                self.service_ready_at.pop(name, None)
+        for name, svc in self.services.items():
+            self.next_check.setdefault(name, 0)
+            if name not in self.service_ready_at:
+                self.service_ready_at[name] = current_time + svc.get('startup_delay', 0)
+
+    def refresh_from_api(self, initial=False):
+        if not self.api_config_url:
+            return
+        now = time.time()
+        if not initial and now < self.next_config_refresh:
+            return
+        try:
+            headers = {}
+            if self.api_token:
+                headers['X-Watchdog-Token'] = self.api_token
+            response = requests.get(self.api_config_url, headers=headers, timeout=15)
+            response.raise_for_status()
+            payload = response.json()
+            self._apply_api_config(payload)
+            logger.info("Loaded monitoring config from API%s", " (initial)" if initial else "")
+        except Exception as exc:
+            logger.error(f"Failed to refresh config from API: {exc}")
+            if initial and not self.services:
+                logger.warning("Falling back to static YAML config; API config unavailable")
+        finally:
+            self.next_config_refresh = now + self.api_refresh_interval
+
+    def _apply_api_config(self, payload):
+        services_payload = payload.get('services', []) if isinstance(payload, dict) else []
+        new_services = {}
+        new_destinations = {}
+        now = time.time()
+        for svc in services_payload:
+            if not svc or not svc.get('enabled', True):
+                continue
+            name = svc.get('service_name') or svc.get('name')
+            if not name:
+                continue
+            health_url = svc.get('health_url') or svc.get('url')
+            if not health_url:
+                logger.debug(f"Skipping service {name}: missing health URL")
+                continue
+            interval_value = svc.get('interval_seconds', svc.get('interval'))
+            interval = self._to_int(interval_value, 30)
+            startup_delay = self._to_int(svc.get('startup_delay_seconds'), 0)
+            actions = self._normalize_actions(svc.get('actions') or ['log'])
+            new_services[name] = {
+                'health_url': health_url,
+                'interval': interval,
+                'actions': actions,
+                'startup_delay': startup_delay
+            }
+            dest_entries = []
+            for dest in svc.get('destinations', []) or []:
+                normalized = self._normalize_destination(dest)
+                if normalized and normalized.get('enabled', True):
+                    dest_entries.append(normalized)
+            new_destinations[name] = dest_entries
+        self.services = new_services
+        self.service_destinations = new_destinations
+        self.smtp_settings = payload.get('smtp_settings') or {}
+        self._sync_tracking_maps(now, reset=False)
+        if any('restart' in svc['actions'] for svc in self.services.values()) and not self.docker_client:
+            self.init_docker()
+
+    def _normalize_destination(self, dest):
+        if not dest:
+            return None
+        config = dest.get('config') if isinstance(dest, dict) else None
+        if isinstance(config, str):
+            try:
+                config = json.loads(config)
+            except json.JSONDecodeError:
+                config = {}
+        elif config is None and dest.get('config_json'):
+            try:
+                config = json.loads(dest['config_json'])
+            except json.JSONDecodeError:
+                config = {}
+        return {
+            'id': dest.get('id'),
+            'name': dest.get('name'),
+            'destination_type': (dest.get('destination_type') or '').lower(),
+            'enabled': dest.get('enabled', True),
+            'config': config or {},
+        }
 
     def init_docker(self):
         # Only initialize if any service uses restart
-        if any('restart' in svc['actions'] for svc in self.services.values()):
-            try:
-                self.docker_client = docker.from_env()
-                logger.info("Docker client initialized for container management")
-            except Exception as e:
-                logger.error(f"Failed to initialize Docker client: {e}")
-                for svc in self.services.values():
-                    svc['actions'] = [a for a in svc['actions'] if a != 'restart']
+        if not any('restart' in svc['actions'] for svc in self.services.values()):
+            return
+        try:
+            self.docker_module = importlib.import_module('docker')
+            self.docker_errors = getattr(self.docker_module, 'errors', None)
+            self.docker_client = self.docker_module.from_env()
+            logger.info("Docker client initialized for container management")
+        except ImportError:
+            logger.error("Docker SDK for Python is not installed; disabling restart actions")
+            for svc in self.services.values():
+                svc['actions'] = [a for a in svc['actions'] if a != 'restart']
+        except Exception as e:
+            logger.error(f"Failed to initialize Docker client: {e}")
+            for svc in self.services.values():
+                svc['actions'] = [a for a in svc['actions'] if a != 'restart']
     
 
     def check_health(self, url: str) -> Optional[Dict[str, Any]]:
@@ -229,9 +388,163 @@ class RadMacWatchdog:
         
         return False
     
+    def _parse_json_blob(self, value):
+        if not value:
+            return {}
+        if isinstance(value, dict):
+            return value
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {}
+        except (ValueError, TypeError):
+            return {}
+
+    def _build_alert_payload(self, service_name: str, service_data: Dict[str, Any]) -> Dict[str, Any]:
+        status = service_data.get('status') or service_data.get('service_status') or 'unhealthy'
+        message = service_data.get('message') or service_data.get('error') or service_data.get('details') or ''
+        payload = {
+            'service': service_name,
+            'status': status,
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'details': service_data,
+        }
+        if message:
+            payload['message'] = message
+        return payload
+
+    def _format_alert_text(self, payload: Dict[str, Any]) -> str:
+        detail = payload.get('message') or ''
+        ip = payload['details'].get('resolved_ip') if isinstance(payload.get('details'), dict) else None
+        lines = [
+            f"Service: {payload.get('service')}",
+            f"Status: {payload.get('status')}",
+            f"Timestamp: {payload.get('timestamp')}",
+        ]
+        if ip:
+            lines.append(f"Target: {ip}")
+        if detail:
+            lines.append(f"Details: {detail}")
+        return "\n".join(lines)
+
+    def _post_webhook(self, url: str, payload: Dict[str, Any], headers: Optional[Dict[str, str]] = None):
+        try:
+            response = requests.post(url, json=payload, headers=headers or {}, timeout=10)
+            if response.status_code >= 300:
+                logger.error(f"Webhook {url} failed with status {response.status_code}")
+        except Exception as exc:
+            logger.error(f"Webhook send failure for {url}: {exc}")
+
+    def _send_email_via_config(self, config: Dict[str, Any], subject: str, body: str):
+        config = config or {}
+        smtp_defaults = self.smtp_settings or {}
+
+        recipient = config.get('email_to') or config.get('to')
+        sender = config.get('email_from') or smtp_defaults.get('from_email') or os.getenv('WATCHDOG_EMAIL_FROM', 'watchdog@radmac.local')
+        if not recipient:
+            logger.warning("Email destination missing recipient; skipping")
+            return
+        smtp_host = config.get('smtp_host') or smtp_defaults.get('host') or os.getenv('WATCHDOG_SMTP_HOST')
+        if not smtp_host:
+            logger.warning("SMTP host not configured for email destination")
+            return
+        smtp_port = config.get('smtp_port') or smtp_defaults.get('port') or os.getenv('WATCHDOG_SMTP_PORT', 587)
+        try:
+            smtp_port = int(smtp_port)
+        except (TypeError, ValueError):
+            smtp_port = 587
+        use_tls = config.get('use_tls')
+        if isinstance(use_tls, str):
+            use_tls = use_tls.lower() in ('1', 'true', 'yes', 'on')
+        if use_tls is None:
+            default_tls = smtp_defaults.get('use_tls')
+            if default_tls is None:
+                use_tls = True
+            else:
+                use_tls = bool(default_tls)
+        smtp_user = config.get('smtp_user') or smtp_defaults.get('username') or os.getenv('WATCHDOG_SMTP_USER')
+        smtp_password = config.get('smtp_password') or smtp_defaults.get('password') or os.getenv('WATCHDOG_SMTP_PASSWORD')
+        use_ssl = config.get('use_ssl')
+        if isinstance(use_ssl, str):
+            use_ssl = use_ssl.lower() in ('1', 'true', 'yes', 'on')
+        if use_ssl is None:
+            use_ssl = bool(smtp_defaults.get('use_ssl'))
+        msg = EmailMessage()
+        msg['Subject'] = subject
+        msg['From'] = sender
+        msg['To'] = recipient
+        msg.set_content(body)
+        try:
+            if use_ssl:
+                smtp_client = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=15)
+            else:
+                smtp_client = smtplib.SMTP(smtp_host, smtp_port, timeout=15)
+            with smtp_client as smtp:
+                if use_tls and not use_ssl:
+                    smtp.starttls()
+                if smtp_user and smtp_password:
+                    smtp.login(smtp_user, smtp_password)
+                smtp.send_message(msg)
+            logger.info(f"Email alert sent to {recipient}")
+        except Exception as exc:
+            logger.error(f"Failed to send email alert: {exc}")
+
+    def notify_destinations(self, service_name: str, service_data: Dict[str, Any]):
+        destinations = self.service_destinations.get(service_name) or []
+        if not destinations:
+            return
+        payload = self._build_alert_payload(service_name, service_data)
+        text_body = self._format_alert_text(payload)
+        subject = f"RadMac alert: {service_name} {payload.get('status')}"
+        for destination in destinations:
+            config = destination.get('config') or {}
+            dtype = (destination.get('destination_type') or 'webhook').lower()
+            try:
+                if dtype in ('webhook', 'slack', 'discord', 'teams'):
+                    url = config.get('webhook_url') or config.get('url')
+                    if not url:
+                        logger.warning(f"Destination {destination.get('name')} missing webhook_url")
+                        continue
+                    headers = self._parse_json_blob(config.get('headers_json'))
+                    extra = self._parse_json_blob(config.get('extra_payload'))
+                    webhook_payload = {**payload, **extra}
+                    self._post_webhook(url, webhook_payload, headers=headers)
+                elif dtype in ('email', 'smtp'):
+                    self._send_email_via_config(config, subject, text_body)
+                elif dtype == 'telegram':
+                    token = config.get('telegram_bot_token') or os.getenv('WATCHDOG_TELEGRAM_BOT_TOKEN')
+                    chat_id = config.get('telegram_chat_id') or os.getenv('WATCHDOG_TELEGRAM_CHAT_ID')
+                    if not token or not chat_id:
+                        logger.warning("Telegram destination missing token or chat_id")
+                        continue
+                    url = f"https://api.telegram.org/bot{token}/sendMessage"
+                    resp = requests.post(url, data={'chat_id': chat_id, 'text': text_body[:4000]}, timeout=10)
+                    if resp.status_code >= 300:
+                        logger.error(f"Telegram API error {resp.status_code}: {resp.text[:120]}")
+                elif dtype == 'pushbullet':
+                    token = config.get('pushbullet_token') or os.getenv('WATCHDOG_PUSHBULLET_TOKEN')
+                    if not token:
+                        logger.warning("Pushbullet destination missing token")
+                        continue
+                    headers = {'Access-Token': token, 'Content-Type': 'application/json'}
+                    payload_data = {
+                        'type': 'note',
+                        'title': subject,
+                        'body': text_body,
+                    }
+                    if config.get('pushbullet_device'):
+                        payload_data['device_iden'] = config['pushbullet_device']
+                    resp = requests.post('https://api.pushbullet.com/v2/pushes', headers=headers, json=payload_data, timeout=10)
+                    if resp.status_code >= 300:
+                        logger.error(f"Pushbullet API error {resp.status_code}: {resp.text[:120]}")
+                else:
+                    logger.warning(f"Unsupported destination type {dtype} for {destination.get('name')}")
+            except Exception as exc:
+                logger.error(f"Failed to send alert to {destination.get('name')}: {exc}")
+        
 
     def handle_unhealthy_service(self, service_name: str, service_data: Dict[str, Any], actions):
-        message = f"{service_name} is {service_data['status']}: {service_data.get('message', 'No details')}"
+        status = service_data.get('status', 'unhealthy')
+        message = f"{service_name} is {status}: {service_data.get('message', 'No details')}"
         logger.warning(message)
         for action in actions:
             if action == 'log':
@@ -259,6 +572,7 @@ class RadMacWatchdog:
                     logger.error(f"Failed to restart {service_name}")
             elif action == 'recover':
                 self.trigger_recovery(service_name, service_data)
+        self.notify_destinations(service_name, service_data)
     
     def trigger_recovery(self, service_name: str, health_data: Dict[str, Any]):
         """Trigger recovery actions for degraded services"""
@@ -292,75 +606,72 @@ class RadMacWatchdog:
 
     def _try_swarm_recovery(self, service_name: str) -> bool:
         """Try recovery using Docker Swarm service exec"""
+        if not self.docker_client:
+            return False
+        docker_errors = self.docker_errors
+        not_found_type = getattr(docker_errors, 'NotFound', None) if docker_errors else None
+        service_full_name = f"{self.container_prefix}_{service_name}"
         try:
-            import docker.errors
-            # Look for Swarm service
-            service_full_name = f"{self.container_prefix}_{service_name}"
-            try:
-                services = self.docker_client.services.list(filters={'name': service_full_name})
-                if services:
-                    service = services[0]
-                    # Get service tasks (containers)
-                    tasks = service.tasks(filters={'desired-state': 'running'})
-                    if tasks:
-                        # Execute on the first running task
-                        task = tasks[0]
-                        container_id = task['Status']['ContainerStatus']['ContainerID']
-                        container = self.docker_client.containers.get(container_id)
-                        
-                        exec_result = container.exec_run(
-                            'python3 /usr/local/bin/recovery_script.py',
-                            stdout=True,
-                            stderr=True
-                        )
-                        
-                        if exec_result.exit_code == 0:
-                            logger.info(f"Swarm recovery success: {exec_result.output.decode()}")
-                            return True
-                        else:
-                            logger.warning(f"Swarm recovery failed: {exec_result.output.decode()}")
-                            return False
-            except docker.errors.NotFound:
+            services = self.docker_client.services.list(filters={'name': service_full_name})
+            if not services:
                 logger.debug(f"No Swarm service found for {service_full_name}")
                 return False
-        except Exception as e:
-            logger.debug(f"Swarm recovery attempt failed: {e}")
+            service = services[0]
+            tasks = service.tasks(filters={'desired-state': 'running'})
+            if not tasks:
+                logger.debug(f"No running Swarm tasks for {service_full_name}")
+                return False
+            task = tasks[0]
+            container_id = task['Status']['ContainerStatus']['ContainerID']
+            container = self.docker_client.containers.get(container_id)
+            exec_result = container.exec_run(
+                'python3 /usr/local/bin/recovery_script.py',
+                stdout=True,
+                stderr=True
+            )
+            if exec_result.exit_code == 0:
+                logger.info(f"Swarm recovery success: {exec_result.output.decode()}")
+                return True
+            logger.warning(f"Swarm recovery failed: {exec_result.output.decode()}")
+            return False
+        except Exception as exc:
+            if not_found_type and isinstance(exc, not_found_type):
+                logger.debug(f"No Swarm service found for {service_full_name}")
+                return False
+            logger.debug(f"Swarm recovery attempt failed: {exc}")
             return False
 
     def _try_container_recovery(self, service_name: str) -> bool:
         """Try recovery using direct container execution (Docker Compose)"""
-        try:
-            # Try different container naming conventions
-            possible_names = [
-                f"{self.container_prefix}_{service_name}_1",
-                f"{self.container_prefix}-{service_name}-1", 
-                f"{service_name}",
-                f"db"  # Common alias
-            ]
-            
-            for container_name in possible_names:
-                try:
-                    container = self.docker_client.containers.get(container_name)
-                    exec_result = container.exec_run(
-                        'python3 /usr/local/bin/recovery_script.py',
-                        stdout=True,
-                        stderr=True
-                    )
-                    
-                    if exec_result.exit_code == 0:
-                        logger.info(f"Container recovery success: {exec_result.output.decode()}")
-                        return True
-                    else:
-                        logger.warning(f"Container recovery failed: {exec_result.output.decode()}")
-                        return False
-                except docker.errors.NotFound:
+        if not self.docker_client:
+            return False
+        docker_errors = self.docker_errors
+        not_found_type = getattr(docker_errors, 'NotFound', None) if docker_errors else None
+        possible_names = [
+            f"{self.container_prefix}_{service_name}_1",
+            f"{self.container_prefix}-{service_name}-1",
+            f"{service_name}",
+            "db",
+        ]
+        for container_name in possible_names:
+            try:
+                container = self.docker_client.containers.get(container_name)
+                exec_result = container.exec_run(
+                    'python3 /usr/local/bin/recovery_script.py',
+                    stdout=True,
+                    stderr=True
+                )
+                if exec_result.exit_code == 0:
+                    logger.info(f"Container recovery success: {exec_result.output.decode()}")
+                    return True
+                logger.warning(f"Container recovery failed: {exec_result.output.decode()}")
+                return False
+            except Exception as exc:
+                if not_found_type and isinstance(exc, not_found_type):
                     continue
-            
-            logger.debug(f"No containers found with names: {possible_names}")
-            return False
-        except Exception as e:
-            logger.debug(f"Container recovery attempt failed: {e}")
-            return False
+                logger.debug(f"Container recovery attempt failed for {container_name}: {exc}")
+        logger.debug(f"No containers found with names: {possible_names}")
+        return False
             
     def _try_http_recovery(self, service_name: str) -> bool:
         """Try recovery using HTTP endpoint"""
@@ -458,16 +769,19 @@ class RadMacWatchdog:
             logger.info(f"Startup grace period: waiting {grace} seconds before monitoring...")
             time.sleep(grace)
         logger.info("RadMac Watchdog started - monitoring all configured services")
-        next_check = {name: 0 for name in self.services}
+        self._sync_tracking_maps(time.time())
         app_health = None
         while True:
             now = time.time()
+            self.refresh_from_api()
+            self._sync_tracking_maps(now)
+            app_config = self.services.get('app')
             # Always check app first if present
-            if 'app' in self.services and now >= next_check['app']:
+            if app_config and now >= self.next_check.get('app', 0) and now >= self.service_ready_at.get('app', 0):
                 try:
-                    app_health = self.check_health(self.services['app']['health_url'])
+                    app_health = self.check_health(app_config['health_url'])
                     if app_health:
-                        self.handle_status_change('app', app_health, self.services['app']['actions'])
+                        self.handle_status_change('app', app_health, app_config['actions'])
                         if app_health['healthy']:
                             self.restart_attempts.clear()
                     else:
@@ -476,17 +790,19 @@ class RadMacWatchdog:
                 except Exception as e:
                     logger.error(f"Watchdog error for app: {e}")
                     app_health = None  # Ensure it's None on error
-                next_check['app'] = now + self.services['app']['interval']
+                self.next_check['app'] = now + app_config['interval']
             # Now check other services
             for name, svc in self.services.items():
                 if name == 'app':
                     continue
-                if now >= next_check[name]:
+                if now < self.service_ready_at.get(name, 0):
+                    continue
+                if now >= self.next_check.get(name, 0):
                     # If this service uses app's /health, only act if app is healthy
-                    if svc['health_url'] == self.services['app']['health_url']:
+                    if app_config and svc['health_url'] == app_config['health_url']:
                         if not (app_health and app_health['healthy'] and app_health.get('data')):
                             logger.info(f"Skipping {name} check: app is not healthy or /health unavailable")
-                            next_check[name] = now + svc['interval']
+                            self.next_check[name] = now + svc['interval']
                             continue
                         # Only act if /health reports this service as unhealthy
                         if 'services' in app_health['data'] and name in app_health['data']['services']:
@@ -506,7 +822,7 @@ class RadMacWatchdog:
                                 logger.error(f"No health response for {name}")
                         except Exception as e:
                             logger.error(f"Watchdog error for {name}: {e}")
-                    next_check[name] = now + svc['interval']
+                    self.next_check[name] = now + svc['interval']
             try:
                 time.sleep(1)
             except KeyboardInterrupt:

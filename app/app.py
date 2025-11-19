@@ -7,6 +7,7 @@ from views.group_views import group
 from views.stats_views import stats
 from views.maintenance_views import maintenance
 from views.health_views import health
+from views.monitoring_views import monitoring
 from config import app_config
 
 
@@ -15,6 +16,16 @@ from logging.handlers import RotatingFileHandler
 
 app = Flask(__name__)
 app.config.from_object(app_config)
+
+# Automatically run database migrations on startup unless explicitly disabled.
+auto_migrate = os.getenv("RADMAC_SKIP_AUTO_MIGRATE", "0").lower() not in ("1", "true", "yes", "on")
+if auto_migrate:
+    try:
+        from db_migrate import migrate as run_db_migrations
+        run_db_migrations()
+    except Exception as exc:
+        print(f"[DB MIGRATION] Auto-run failed: {exc}")
+        # Let the app start anyway; health endpoint will surface DB issues.
 
 # Flask-Login setup
 login_manager = LoginManager()
@@ -125,6 +136,7 @@ app.register_blueprint(group, url_prefix='/group')
 app.register_blueprint(stats, url_prefix='/stats')
 app.register_blueprint(maintenance, url_prefix='/maintenance')
 app.register_blueprint(health)
+app.register_blueprint(monitoring)
 
 # Initialize database connection pool
 from db_connection import init_connection_pool

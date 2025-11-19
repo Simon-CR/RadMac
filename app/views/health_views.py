@@ -3,6 +3,7 @@ import mysql.connector
 import os
 import socket
 from db_connection import get_connection
+from db_interface import get_monitor_checks
 from datetime import datetime
 
 health = Blueprint('health', __name__)
@@ -96,6 +97,23 @@ def health_check():
         status["status"] = "unhealthy"
         status["message"] = "One or more services are experiencing issues"
         status["errors"] = errors
+
+    # Attach persisted monitoring results for external observers
+    try:
+        monitoring_checks = get_monitor_checks(include_disabled=True)
+        for check in monitoring_checks:
+            monitor_snapshot = {
+                "monitor_last_run": check.get("last_run").isoformat() + "Z" if check.get("last_run") else None,
+                "dns_status": check.get("dns_status", "unknown"),
+                "resolved_ip": check.get("resolved_ip"),
+                "ping_status": check.get("ping_status", "unknown"),
+                "service_status": check.get("service_status", "unknown"),
+                "details": check.get("details"),
+            }
+            status["services"].setdefault(check["service_name"], {})
+            status["services"][check["service_name"]]["monitoring"] = monitor_snapshot
+    except Exception as exc:
+        errors.append(f"Monitoring snapshot unavailable: {exc}")
     
     # Return appropriate HTTP status code
     http_status = 200 if overall_healthy else 503

@@ -53,6 +53,9 @@ The project includes a ready-to-use docker-compose.yml.
 2. Create environment file
 	Copy .env.template to .env and edit:
 	- Fill in your MySQL credentials and other optional settings like OUI_API_KEY.
+	- Generate a `MONITORING_API_TOKEN` so the app and watchdog share a secret for the monitoring API feed.
+	- Point `WATCHDOG_CONFIG_API_URL` at the Flask app directly (e.g., `http://app:8080/monitoring/api/watchdog-config`) and set `WATCHDOG_CONFIG_API_TOKEN` to the same token so the watchdog can pull live config even if nginx is down.
+	- (Optional) Set SMTP credentials (`WATCHDOG_SMTP_*`) if you plan to create email destinations in the new monitoring UI.
 
 3. Run the stack
 	docker-compose up --build
@@ -99,6 +102,31 @@ curl -i http://localhost:8083/health   # Radius
 - Use `.env` for secrets, notification tokens, and any value you want to override at deployment time without editing the config file.
 - Do not duplicate values unless you want override behavior.
 
+## 📊 Monitoring UI & Alert Destinations
+
+RadMac now ships with a dedicated **Monitoring** page inside the web UI where you can:
+
+- Review DNS resolution, discovered IPs, ping state, and service health for each monitored component (app, nginx, database, radius, and anything else you add).
+- Adjust interval cadence, per-service startup delays, enabled actions, and "run now" without restarting containers.
+- Assign one or more alert destinations (email, SMTP, webhook, Slack, Teams, Discord, Telegram, Pushbullet, etc.) to each check—all configuration lives in the database.
+
+### How the watchdog consumes the new config
+
+- The Flask app exposes `/monitoring/api/watchdog-config`, protected by `MONITORING_API_TOKEN`.
+- Set `WATCHDOG_CONFIG_API_URL` (point it straight at the app container to bypass nginx) and `WATCHDOG_CONFIG_API_TOKEN` in the watchdog environment. The watchdog still reads `watchdog_config.yaml` on boot, but it now refreshes from the API every `WATCHDOG_CONFIG_REFRESH_SECONDS` (default 120s) and falls back to YAML only if the API is unreachable.
+- Because the watchdog talks directly to the app, alerts can still be sent even when nginx or other proxy layers are unhealthy.
+
+### Alert destinations & notifications
+
+- Destinations are managed entirely in the UI—no more `.env` sprawl for webhook URLs or SMTP credentials.
+- Each destination stores its own headers/payload overrides, so the watchdog can call services like Slack, Discord, Teams, Telegram, Pushbullet, or plain webhooks.
+- Email/SMTP destinations can be configured with `email_from`, `email_to`, SMTP host/port/user/password, and TLS preferences. The watchdog uses those values when an assigned check goes unhealthy.
+
+### Startup delays & health history
+
+- Every check tracks `startup_delay_seconds` so you can give services time to warm up before alerts fire (e.g., nginx might wait 75 s, database 90 s).
+- The `/health` endpoint now includes the recorded DNS/ping/service results from the monitoring service so external uptime monitors can read the same status that powers the UI.
+
 ---
 
 📄 License
@@ -106,7 +134,26 @@ curl -i http://localhost:8083/health   # Radius
 ---
 
 
-## 📝 Changelog
+## � RADIUS Client Allow List
+
+The bundled RADIUS server now supports flexible allow-list entries via the `RADIUS_ALLOWED_CLIENTS`
+environment variable. Provide a comma-separated list of values in any of these forms:
+
+- `192.168.1.50` – explicit IP address.
+- `switch-01` – hostname (resolved inside the container to one or more IPs).
+- `192.168.1.0/24` – CIDR network; any client IP inside the range is accepted.
+- `*` / `any` / `0.0.0.0` – wildcard (accepts all clients; useful for labs, not production).
+- Append `:secret` to override the default shared secret for that entry, e.g.,
+  `192.168.1.50:mysecret` or `10.10.0.0/16:netsecret`.
+
+If `RADIUS_ALLOWED_CLIENTS` is omitted, RadMac automatically attempts to allow localhost plus the
+`app`, `nginx`, and `radius` service DNS names. Each hostname is resolved to its current IP so the
+Flask test endpoint (`/test_radius`) and other containers can talk to the RADIUS server without
+manual IP bookkeeping.
+
+
+
+## �📝 Changelog
 
 
 ### v1.3.0 (2025-11-19)

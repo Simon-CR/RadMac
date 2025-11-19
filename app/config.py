@@ -30,6 +30,9 @@ class Config:
     RADIUS_PORT = int(os.getenv('RADIUS_PORT', '1812'))
     RADIUS_SECRET = os.getenv('RADIUS_SECRET', 'testing123')
 
+    # Monitoring API
+    MONITORING_API_TOKEN = os.getenv('MONITORING_API_TOKEN', '')
+
 class DevelopmentConfig(Config):
     DEBUG = True
 

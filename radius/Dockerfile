@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Install runtime dependencies (for mysql-connector, networking tools, and supervisord)
 RUN apt-get update && \
-    apt-get install -y gcc libmariadb-dev iputils-ping supervisor curl && \
+    apt-get install -y gcc libmariadb-dev iputils-ping iproute2 supervisor curl && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies

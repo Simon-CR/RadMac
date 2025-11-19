@@ -8,6 +8,7 @@ import os
 import subprocess
 import pytz
 import shutil
+import json
 
 def safe_db_operation(operation_func, default_return=None):
     """Wrapper for database operations with proper error handling"""
@@ -789,4 +790,328 @@ def get_table_stats():
         cursor.close()
         conn.close()
         
+
+# ------------------------------
+# Monitoring Configuration Functions
+# ------------------------------
+
+def _parse_json_field(value, fallback=None):
+    if value is None:
+        return fallback if fallback is not None else {}
+    try:
+        parsed = json.loads(value)
+        return parsed
+    except (ValueError, TypeError):
+        if isinstance(value, str):
+            return value
+        return fallback if fallback is not None else {}
+
+
+def _serialize_actions(actions):
+    if actions is None:
+        return json.dumps([])
+    if isinstance(actions, str):
+        actions_list = [actions]
+    else:
+        actions_list = [a for a in actions if a]
+    return json.dumps(actions_list)
+
+
+def _serialize_details(details):
+    if details is None:
+        return None
+    if isinstance(details, (dict, list)):
+        return json.dumps(details)
+    return str(details)
+
+
+def get_smtp_settings():
+    def _operation():
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM smtp_settings ORDER BY id LIMIT 1")
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return row
+
+    return safe_db_operation(_operation, None)
+
+
+def save_smtp_settings(settings):
+    def _operation():
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM smtp_settings ORDER BY id LIMIT 1")
+        existing = cursor.fetchone() or {}
+        merged = existing.copy()
+        merged.update({k: v for k, v in settings.items() if v is not None})
+        cursor.close()
+
+        cursor = conn.cursor()
+        try:
+            port_value = int(merged.get("port", 587))
+        except (TypeError, ValueError):
+            port_value = 587
+        def _as_bool(value, default=False):
+            if value is None:
+                return 1 if default else 0
+            if isinstance(value, str):
+                return 1 if value.lower() in ("1", "true", "yes", "on") else 0
+            return 1 if bool(value) else 0
+        cursor.execute(
+            """
+            INSERT INTO smtp_settings (id, host, port, username, password, use_tls, use_ssl, from_email)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                host = VALUES(host),
+                port = VALUES(port),
+                username = VALUES(username),
+                password = VALUES(password),
+                use_tls = VALUES(use_tls),
+                use_ssl = VALUES(use_ssl),
+                from_email = VALUES(from_email)
+            """,
+            (
+                1,
+                merged.get("host"),
+                port_value,
+                merged.get("username"),
+                merged.get("password"),
+                _as_bool(merged.get("use_tls"), default=True),
+                _as_bool(merged.get("use_ssl"), default=False),
+                merged.get("from_email"),
+            ),
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+
+    return safe_db_operation(_operation, False)
+
+
+def get_alert_destinations(include_disabled=False):
+    def _operation():
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        query = "SELECT * FROM alert_destinations"
+        params = []
+        if not include_disabled:
+            query += " WHERE enabled = 1"
+        query += " ORDER BY name"
+        cursor.execute(query, params)
+        destinations = cursor.fetchall()
+        for dest in destinations:
+            dest["config"] = _parse_json_field(dest.get("config_json"), {})
+        cursor.close()
+        conn.close()
+        return destinations
+
+    return safe_db_operation(_operation, [])
+
+
+def add_alert_destination(name, destination_type, config, enabled=True):
+    def _operation():
+        conn = get_connection()
+        cursor = conn.cursor()
+        config_json = json.dumps(config or {})
+        cursor.execute(
+            """INSERT INTO alert_destinations (name, destination_type, config_json, enabled)
+                VALUES (%s, %s, %s, %s)
+            """,
+            (name, destination_type, config_json, 1 if enabled else 0)
+        )
+        conn.commit()
+        new_id = cursor.lastrowid
+        cursor.close()
+        conn.close()
+        return new_id
+
+    return safe_db_operation(_operation, None)
+
+
+def update_alert_destination(destination_id, name=None, destination_type=None, config=None, enabled=None):
+    def _operation():
+        conn = get_connection()
+        cursor = conn.cursor()
+        updates = []
+        params = []
+        if name is not None:
+            updates.append("name = %s")
+            params.append(name)
+        if destination_type is not None:
+            updates.append("destination_type = %s")
+            params.append(destination_type)
+        if config is not None:
+            updates.append("config_json = %s")
+            params.append(json.dumps(config))
+        if enabled is not None:
+            updates.append("enabled = %s")
+            params.append(1 if enabled else 0)
+        if not updates:
+            return False
+        params.append(destination_id)
+        cursor.execute(
+            f"UPDATE alert_destinations SET {', '.join(updates)} WHERE id = %s",
+            tuple(params)
+        )
+        conn.commit()
+        updated = cursor.rowcount > 0
+        cursor.close()
+        conn.close()
+        return updated
+
+    return safe_db_operation(_operation, False)
+
+
+def delete_alert_destination(destination_id):
+    def _operation():
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM alert_destinations WHERE id = %s", (destination_id,))
+        conn.commit()
+        deleted = cursor.rowcount > 0
+        cursor.close()
+        conn.close()
+        return deleted
+
+    return safe_db_operation(_operation, False)
+
+
+def get_monitor_checks(include_disabled=False):
+    def _operation():
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        query = """
+            SELECT mc.*, mcs.last_run, mcs.dns_status, mcs.resolved_ip,
+                   mcs.ping_status, mcs.service_status, mcs.details
+            FROM monitor_checks mc
+            LEFT JOIN monitor_check_status mcs ON mc.id = mcs.check_id
+        """
+        params = []
+        if not include_disabled:
+            query += " WHERE mc.enabled = 1"
+        query += " ORDER BY mc.display_name"
+        cursor.execute(query, params)
+        checks = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        fallback_destinations = get_alert_destinations(include_disabled=include_disabled)
+        for row in checks:
+            row['actions'] = _parse_json_field(row.get('actions'), [])
+            row['details'] = _parse_json_field(row.get('details'), {}) if row.get('details') else None
+            row['destinations'] = fallback_destinations
+        return checks
+
+    return safe_db_operation(_operation, [])
+
+
+def get_monitor_check_by_name(service_name, include_disabled=True):
+    def _operation():
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT mc.*, mcs.last_run, mcs.dns_status, mcs.resolved_ip,
+                   mcs.ping_status, mcs.service_status, mcs.details
+            FROM monitor_checks mc
+            LEFT JOIN monitor_check_status mcs ON mc.id = mcs.check_id
+            WHERE mc.service_name = %s
+            """,
+            (service_name,)
+        )
+        row = cursor.fetchone()
+        if row:
+            row['actions'] = _parse_json_field(row.get('actions'), [])
+            row['details'] = _parse_json_field(row.get('details'), {}) if row.get('details') else None
+            row['destinations'] = get_alert_destinations(include_disabled=include_disabled)
+        cursor.close()
+        conn.close()
+        return row
+
+    return safe_db_operation(_operation, None)
+
+
+def update_monitor_check_settings(service_name, interval_seconds=None, startup_delay_seconds=None, enabled=None, actions=None):
+    def _operation():
+        conn = get_connection()
+        cursor = conn.cursor()
+        updates = []
+        params = []
+        if interval_seconds is not None:
+            updates.append("interval_seconds = %s")
+            params.append(interval_seconds)
+        if startup_delay_seconds is not None:
+            updates.append("startup_delay_seconds = %s")
+            params.append(startup_delay_seconds)
+        if enabled is not None:
+            updates.append("enabled = %s")
+            params.append(1 if enabled else 0)
+        if actions is not None:
+            updates.append("actions = %s")
+            params.append(_serialize_actions(actions))
+        if not updates:
+            return False
+        params.append(service_name)
+        cursor.execute(
+            f"UPDATE monitor_checks SET {', '.join(updates)} WHERE service_name = %s",
+            tuple(params)
+        )
+        conn.commit()
+        updated = cursor.rowcount > 0
+        cursor.close()
+        conn.close()
+        return updated
+
+    return safe_db_operation(_operation, False)
+
+
+def record_monitor_check_status(service_name, status_payload):
+    def _operation():
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM monitor_checks WHERE service_name = %s", (service_name,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        check_id = row[0]
+        cursor.execute(
+            """
+            INSERT INTO monitor_check_status
+                (check_id, last_run, dns_status, resolved_ip, ping_status, service_status, details)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                last_run = VALUES(last_run),
+                dns_status = VALUES(dns_status),
+                resolved_ip = VALUES(resolved_ip),
+                ping_status = VALUES(ping_status),
+                service_status = VALUES(service_status),
+                details = VALUES(details)
+            """,
+            (
+                check_id,
+                status_payload.get('last_run', datetime.utcnow()),
+                status_payload.get('dns_status', 'unknown'),
+                status_payload.get('resolved_ip'),
+                status_payload.get('ping_status', 'unknown'),
+                status_payload.get('service_status', 'unknown'),
+                _serialize_details(status_payload.get('details')),
+            )
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+
+    return safe_db_operation(_operation, False)
+
+
+def get_monitoring_config(include_disabled_destinations=False):
+    return {
+        "checks": get_monitor_checks(include_disabled=True),
+        "destinations": get_alert_destinations(include_disabled=include_disabled_destinations),
+        "smtp_settings": get_smtp_settings()
+    }
+
 
