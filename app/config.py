@@ -25,6 +25,11 @@ class Config:
     # Timezone
     APP_TIMEZONE = os.getenv('APP_TIMEZONE', 'UTC')
 
+    # RADIUS Configuration
+    RADIUS_HOST = os.getenv('RADIUS_HOST', 'radius')
+    RADIUS_PORT = int(os.getenv('RADIUS_PORT', '1812'))
+    RADIUS_SECRET = os.getenv('RADIUS_SECRET', 'testing123')
+
 class DevelopmentConfig(Config):
     DEBUG = True
 
