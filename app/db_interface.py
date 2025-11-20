@@ -86,6 +86,12 @@ def get_auth_user_by_username(username):
 # User Management Functions
 # ------------------------------
 
+def normalize_mac(mac):
+    """Normalize MAC address to uppercase hex with no separators."""
+    if not mac:
+        return ""
+    return mac.replace(":", "").replace("-", "").replace(".", "").upper()
+
 def get_all_users():
     """Retrieve all users with associated group and vendor information."""
     conn = get_connection()
@@ -111,7 +117,7 @@ def get_user_by_mac(mac_address):
     cursor = conn.cursor(dictionary=True)
     cursor.execute("""
         SELECT * FROM users WHERE mac_address = %s
-    """, (mac_address,))
+    """, (normalize_mac(mac_address),))
     user = cursor.fetchone()
     cursor.close()
     conn.close()
@@ -134,7 +140,7 @@ def add_user(mac_address, description, vlan_id):
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO users (mac_address, description, vlan_id) VALUES (%s, %s, %s)",
-        (mac_address.lower(), description, vlan_id)
+        (normalize_mac(mac_address), description, vlan_id)
     )
     conn.commit()
     cursor.close()
@@ -146,7 +152,7 @@ def update_user(mac_address, description, vlan_id):
     cursor = conn.cursor()
     cursor.execute(
         "UPDATE users SET description = %s, vlan_id = %s WHERE mac_address = %s",
-        (description, vlan_id, mac_address.lower())
+        (description, vlan_id, normalize_mac(mac_address))
     )
     conn.commit()
     cursor.close()
@@ -156,7 +162,7 @@ def delete_user(mac_address):
     """Remove a user from the database by their MAC address."""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM users WHERE mac_address = %s", (mac_address.lower(),))
+    cursor.execute("DELETE FROM users WHERE mac_address = %s", (normalize_mac(mac_address),))
     conn.commit()
     cursor.close()
     conn.close()

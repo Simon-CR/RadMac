@@ -667,7 +667,7 @@ def sync_schema_with_desired(conn, db_name: str) -> bool:
 
 def migrate():
     # Define the current schema version
-    CURRENT_VERSION = 3
+    CURRENT_VERSION = 4
     
     try:
         conn = get_connection()
@@ -727,6 +727,36 @@ def migrate():
             seed_smtp_settings(cursor)
             set_schema_version(cursor, 3)
             print("[DB MIGRATION] Upgraded to schema version 3.")
+
+        if current_version < 4:
+            # Migration to version 4: Normalize MAC addresses
+            print("[DB MIGRATION] Normalizing MAC addresses in users and auth_logs...")
+            try:
+                # Disable foreign key checks temporarily just in case
+                cursor.execute("SET FOREIGN_KEY_CHECKS=0")
+                
+                # Normalize users table
+                # We use IGNORE to skip duplicates if they exist (though they shouldn't ideally)
+                cursor.execute("""
+                    UPDATE IGNORE users 
+                    SET mac_address = UPPER(REPLACE(REPLACE(REPLACE(mac_address, ':', ''), '-', ''), '.', ''))
+                """)
+                print(f"[DB MIGRATION] Normalized {cursor.rowcount} rows in users table.")
+                
+                # Normalize auth_logs table
+                cursor.execute("""
+                    UPDATE auth_logs 
+                    SET mac_address = UPPER(REPLACE(REPLACE(REPLACE(mac_address, ':', ''), '-', ''), '.', ''))
+                """)
+                print(f"[DB MIGRATION] Normalized {cursor.rowcount} rows in auth_logs table.")
+                
+                cursor.execute("SET FOREIGN_KEY_CHECKS=1")
+                
+                set_schema_version(cursor, 4)
+                print("[DB MIGRATION] Upgraded to schema version 4.")
+                
+            except Exception as e:
+                print(f"[DB MIGRATION] Error normalizing MACs: {e}")
         
         # Future migrations would go here:
         # if current_version < 2:

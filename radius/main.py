@@ -153,16 +153,52 @@ class MacRadiusServer(Server):
         cursor = None
         
         try:
-            username = pkt['User-Name'][0].upper()
-            print(f"→ Parsed MAC: {username}")
+            # Helper to safely decode attributes
+            def safe_decode(value):
+                if isinstance(value, bytes):
+                    return value.decode('utf-8', errors='ignore')
+                return str(value)
+
+            # Try to get MAC from Calling-Station-Id (Attribute 31) first
+            mac_address = None
+            if 'Calling-Station-Id' in pkt:
+                raw_mac = safe_decode(pkt['Calling-Station-Id'][0])
+                # Normalize MAC: remove separators, uppercase
+                mac_address = raw_mac.replace('-', '').replace(':', '').replace('.', '').upper()
+                print(f"→ Found Calling-Station-Id: {raw_mac} -> {mac_address}")
+
+            # Fallback to User-Name if Calling-Station-Id is missing or invalid
+            username = safe_decode(pkt['User-Name'][0])
+            print(f"→ User-Name: {username}")
+            
+            if not mac_address:
+                # Try to use username as MAC if it looks like one
+                potential_mac = username.replace('-', '').replace(':', '').replace('.', '').upper()
+                # Basic check if it's hex and correct length
+                if len(potential_mac) == 12 and all(c in '0123456789ABCDEF' for c in potential_mac):
+                    mac_address = potential_mac
+                    print(f"→ Using User-Name as MAC: {mac_address}")
+                else:
+                    print(f"⚠️ User-Name '{username}' is not a valid MAC address and Calling-Station-Id is missing.")
+
             print(f"→ Attributes: {[f'{k}={v}' for k, v in pkt.items()]}")
+
+            if not mac_address:
+                print("❌ Could not determine a valid MAC address from request.")
+                # We can't query the DB or insert logs without a valid MAC due to constraints
+                # Send a reject
+                reply = self.CreateReplyPacket(pkt)
+                reply.code = AccessReject
+                self.SendReplyPacket(pkt.fd, reply)
+                print("📤 Response sent: Access-Reject (Invalid MAC)\n")
+                return
 
             # Get connection from pool
             connection = self.get_db_connection()
             cursor = connection.cursor(dictionary=True)
             now_utc = datetime.now(timezone.utc)
 
-            cursor.execute("SELECT vlan_id FROM users WHERE mac_address = %s", (username,))
+            cursor.execute("SELECT vlan_id FROM users WHERE mac_address = %s", (mac_address,))
             result = cursor.fetchone()
 
             reply = self.CreateReplyPacket(pkt)
@@ -172,14 +208,14 @@ class MacRadiusServer(Server):
                 denied_vlan = os.getenv("DENIED_VLAN", "999")
 
                 if vlan_id == denied_vlan:
-                    print(f"🚫 MAC {username} found, but on denied VLAN {vlan_id}")
+                    print(f"🚫 MAC {mac_address} found, but on denied VLAN {vlan_id}")
                     reply.code = AccessReject
                     cursor.execute("""
                         INSERT INTO auth_logs (mac_address, reply, result, timestamp)
                         VALUES (%s, %s, %s, %s)
-                    """, (username, "Access-Reject", f"Denied due to VLAN {denied_vlan}", now_utc))
+                    """, (mac_address, "Access-Reject", f"Denied due to VLAN {denied_vlan}", now_utc))
                 else:
-                    print(f"✅ MAC {username} found, assigning VLAN {vlan_id}")
+                    print(f"✅ MAC {mac_address} found, assigning VLAN {vlan_id}")
                     reply.code = AccessAccept
                     reply.AddAttribute("Tunnel-Type", 13)
                     reply.AddAttribute("Tunnel-Medium-Type", 6)
@@ -187,9 +223,9 @@ class MacRadiusServer(Server):
                     cursor.execute("""
                         INSERT INTO auth_logs (mac_address, reply, result, timestamp)
                         VALUES (%s, %s, %s, %s)
-                    """, (username, "Access-Accept", f"Assigned to VLAN {vlan_id}", now_utc))
+                    """, (mac_address, "Access-Accept", f"Assigned to VLAN {vlan_id}", now_utc))
             else:
-                print(f"⚠️ MAC {username} not found, assigning fallback VLAN {DEFAULT_VLAN_ID}")
+                print(f"⚠️ MAC {mac_address} not found, assigning fallback VLAN {DEFAULT_VLAN_ID}")
                 reply.code = AccessAccept
                 reply["Tunnel-Type"] = 13
                 reply["Tunnel-Medium-Type"] = 6
@@ -197,7 +233,7 @@ class MacRadiusServer(Server):
                 cursor.execute("""
                     INSERT INTO auth_logs (mac_address, reply, result, timestamp)
                     VALUES (%s, %s, %s, %s)
-                """, (username, "Access-Accept", f"Assigned to fallback VLAN {DEFAULT_VLAN_ID}", now_utc))
+                """, (mac_address, "Access-Accept", f"Assigned to fallback VLAN {DEFAULT_VLAN_ID}", now_utc))
 
             # Commit the transaction
             connection.commit()

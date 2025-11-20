@@ -156,6 +156,17 @@ manual IP bookkeeping.
 ## �📝 Changelog
 
 
+### v1.3.1 (2025-11-20)
+- **RADIUS Server Improvements**:
+  - Added support for `Calling-Station-Id` (Attribute 31) for MAC address lookup, prioritizing it over `User-Name`.
+  - Implemented automatic MAC address normalization (strips `:`, `-`, `.`, and converts to uppercase) to handle various client formats (e.g., `aa:bb:cc...`).
+  - Added robust byte-decoding for RADIUS attributes.
+- **Web App & Database**:
+  - Added automatic MAC address normalization in the Web UI when adding/updating users.
+  - Added Database Migration v4 to automatically normalize all existing MAC addresses in `users` and `auth_logs` tables on startup.
+- **Docker**:
+  - Updated build process to ensure multi-arch support (`linux/amd64` and `linux/arm64`) for all images.
+
 ### v1.3.0 (2025-11-19)
 - Added a **RADIUS Test** button in the web UI so operators can validate MAC auth flows directly from RadMac.
 - Bundled a minimal RADIUS dictionary with the Flask app and added an override (`RADIUS_DICTIONARY_PATH`) so the test endpoint always has access to the necessary attributes.
