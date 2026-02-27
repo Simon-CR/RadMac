@@ -42,7 +42,12 @@ services:
     container_name: radmac-app
     depends_on:
       - db
-    command: /bin/sh -c "sleep 15 && python db_migrate.py && gunicorn --bind 0.0.0.0:8080 wsgi:app --timeout 120 --workers 2"
+    command:
+      [
+        "/bin/sh",
+        "-c",
+        "sleep 15 && python db_migrate.py && gunicorn --bind 0.0.0.0:8080 wsgi:app --timeout 120 --workers 2",
+      ]
     environment:
       FLASK_APP: wsgi:app
       FLASK_ENV: production
