@@ -11,8 +11,13 @@ import time
 import socket
 import threading
 
+# Global state for rate calculations
+LAST_ABORTED = None
+LAST_CHECK_TIME = None
+
 def check_mariadb():
     """Comprehensive MariaDB health check including connection handling"""
+    global LAST_ABORTED, LAST_CHECK_TIME
     try:
         root_password = os.getenv('MARIADB_ROOT_PASSWORD', '')
         
@@ -59,11 +64,26 @@ def check_mariadb():
         threads_connected = int(metrics.get('Threads_connected', '0'))
         
         warnings = []
-        # Increased thresholds - be less sensitive to normal connection drops
-        if threads_connected > 150:  # Increased from 100
+        if threads_connected > 150:
             warnings.append(f"High connection count: {threads_connected}")
-        if aborted_connects > 100:  # Increased from 50 - normal operations can have many
-            warnings.append(f"High aborted connections: {aborted_connects}")
+            
+        # Calculate rate of aborted connections instead of absolute value
+        current_time = time.time()
+        
+        if LAST_ABORTED is not None and LAST_CHECK_TIME is not None:
+            time_diff = current_time - LAST_CHECK_TIME
+            aborted_diff = aborted_connects - LAST_ABORTED
+            
+            # If time_diff is very small or negative (clock skew), skip rate check
+            if time_diff > 0 and aborted_diff > 0:
+                aborted_rate_per_min = (aborted_diff / time_diff) * 60
+                
+                # Alert if rate is > 30 aborted connections per minute (1 every 2 seconds)
+                if aborted_rate_per_min > 30:
+                    warnings.append(f"High aborted connections rate: {aborted_rate_per_min:.1f}/min")
+        
+        LAST_ABORTED = aborted_connects
+        LAST_CHECK_TIME = current_time
         
         return True, warnings if warnings else None
         

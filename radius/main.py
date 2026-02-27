@@ -209,7 +209,13 @@ if __name__ == '__main__':
     print("🚀 Starting MacRadiusServer...")
     dictionary_path = resolve_dictionary_path()
     srv = MacRadiusServer(dict=Dictionary(dictionary_path))
-    srv.hosts["0.0.0.0"] = RemoteHost("0.0.0.0", os.getenv("RADIUS_SECRET", "testing123").encode(), "localhost")
+    radius_secret = os.getenv("RADIUS_SECRET", "testing123").encode()
+    srv.hosts["0.0.0.0"] = RemoteHost("0.0.0.0", radius_secret, "localhost")
+    srv.hosts["127.0.0.1"] = RemoteHost("127.0.0.1", radius_secret, "localhost")
+    
+    # In Docker, the request could also appear to come from the container IP
+    # But for a local loopback check, 127.0.0.1 is usually sufficient.
+    
     print("📡 Listening on 0.0.0.0 for incoming RADIUS requests...")
     srv.BindToAddress("0.0.0.0")
     srv.Run()

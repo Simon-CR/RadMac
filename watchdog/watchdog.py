@@ -28,6 +28,8 @@ class RadMacWatchdog:
         self.config_path = config_path
         self.services = {}
         self.last_status = {}
+        self.pending_status = {}
+        self.consecutive_checks = {}
         self.restart_attempts = {}
         self.docker_client = None
         
@@ -71,10 +73,12 @@ class RadMacWatchdog:
                 interval = default_interval
                 
             actions = svc.get('actions', ['log'])
+            threshold = svc.get('failure_threshold', 3)
             self.services[name] = {
                 'health_url': svc['health_url'],
                 'interval': interval,
-                'actions': actions
+                'actions': actions,
+                'threshold': threshold
             }
 
     def init_docker(self):
@@ -392,15 +396,35 @@ class RadMacWatchdog:
         current_data = health_response.get('data', {})
         current_status = current_data.get('status', 'healthy' if current_healthy else 'unhealthy')
         
-        status_changed = False
+        # Initialize tracking maps if necessary
+        if service_name not in self.pending_status:
+            self.pending_status[service_name] = current_status
+            self.consecutive_checks[service_name] = 0
+            
         previous_status = self.last_status.get(service_name, {})
         previous_healthy = previous_status.get('healthy') if isinstance(previous_status, dict) else previous_status
         previous_state = previous_status.get('status') if isinstance(previous_status, dict) else None
         
+        # Debounce Logic:
+        # If the incoming status matches our pending state, increment the counter.
+        # Otherwise, reset the pending state and counter.
+        if current_status == self.pending_status[service_name]:
+            self.consecutive_checks[service_name] += 1
+        else:
+            self.pending_status[service_name] = current_status
+            self.consecutive_checks[service_name] = 1
+            
+        threshold = self.services.get(service_name, {}).get('threshold', 3)
+        status_changed = False
+        
+        # Only officially transition state if we've hit the exact threshold limit to prevent duplicate spam,
+        # OR if it's the very first time we are seeing this service.
         if previous_healthy is None:
             logger.info(f"Initial health check for {service_name} - monitoring started")
             status_changed = True
-        elif previous_healthy != current_healthy or previous_state != current_status:
+            # Fast-track initial state
+            self.consecutive_checks[service_name] = threshold
+        elif previous_state != current_status and self.consecutive_checks[service_name] == threshold:
             status_changed = True
             if current_healthy and current_status == 'healthy':
                 logger.info(f"🎉 {service_name} recovered - healthy!")
@@ -412,7 +436,7 @@ class RadMacWatchdog:
             else:
                 logger.error(f"🚨 {service_name} became unhealthy!")
         
-        # Handle degraded status - trigger recovery actions
+        # Handle degraded status - trigger recovery actions (only once per transition)
         if current_status == 'degraded' and status_changed:
             logger.info(f"Triggering recovery actions for degraded service: {service_name}")
             recovery_actions = [action for action in actions if action in ['recover', 'log']]
@@ -422,7 +446,7 @@ class RadMacWatchdog:
                 warnings = current_data.get('warnings', [])
                 logger.warning(f"{service_name} degraded - warnings: {', '.join(warnings)}")
         
-        # Only trigger actions on status change, not on every failed check
+        # Only trigger actions on official status change (which now happens after debounce threshold), not on every failed check
         if status_changed and not current_healthy and current_data:
             # If health endpoint returns per-service, use that, else just this service
             if 'services' in current_data:
@@ -432,12 +456,13 @@ class RadMacWatchdog:
             else:
                 self.handle_unhealthy_service(service_name, current_data, actions)
         
-        # Store both healthy status and detailed status
-        self.last_status[service_name] = {
-            'healthy': current_healthy,
-            'status': current_status,
-            'timestamp': time.time()
-        }
+        # Only update the 'official' last status if we hit the threshold
+        if status_changed or previous_healthy is None:
+            self.last_status[service_name] = {
+                'healthy': current_healthy,
+                'status': current_status,
+                'timestamp': time.time()
+            }
     
 
 

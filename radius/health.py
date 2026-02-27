@@ -23,23 +23,54 @@ def health_check():
         db_status = {"status": "unhealthy", "message": f"Database connection failed: {str(e)}"}
         db_healthy = False
 
-    # Check UDP port (test if it's in use by radius service)
+    # Check RADIUS UDP port by sending a real packet
     try:
         radius_port = int(os.getenv('RADIUS_PORT', 1812))
-        # Instead of trying to bind (which would fail if radius is running),
-        # we'll check if we can connect to the radius service
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.settimeout(1)
-        # Just test the socket creation and check if port is available
-        # If we can't bind to a nearby port, the networking is probably broken
-        test_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        test_sock.bind(("127.0.0.1", 0))  # Bind to any available port
-        test_sock.close()
-        sock.close()
-        port_status = {"status": "healthy", "message": f"UDP networking functional, RADIUS on port {radius_port}"}
-        port_healthy = True
+        radius_secret = os.getenv('RADIUS_SECRET', 'testing123').encode()
+        
+        # We need to resolve the dictionary path just like the main server does
+        from pathlib import Path
+        import traceback
+        
+        candidates = [
+            Path("/app/dictionary"),
+            Path("/app/radius/dictionary"),
+            Path(__file__).resolve().parent / "dictionary"
+        ]
+        
+        dict_path = None
+        for candidate in candidates:
+            if candidate.is_file():
+                dict_path = str(candidate)
+                break
+                
+        if not dict_path:
+            raise FileNotFoundError("Could not find RADIUS dictionary for health check")
+            
+        from pyrad.client import Client, Timeout
+        from pyrad.dictionary import Dictionary
+        
+        # Create a pyrad client pointed at localhost
+        client = Client(server="127.0.0.1", secret=radius_secret, dict=Dictionary(dict_path))
+        client.timeout = 2
+        client.retries = 1
+        
+        # Construct a dummy Access-Request
+        # MAC address must be exactly 12 chars to avoid SQL DataError in the radius server logs
+        req = client.CreateAuthPacket(code=1, User_Name="001122334455")
+        
+        # Send the packet and wait for response (Accept or Reject doesn't matter, just need a protocol response)
+        try:
+            reply = client.SendPacket(req)
+            port_status = {"status": "healthy", "message": f"RADIUS server responded successfully on port {radius_port}"}
+            port_healthy = True
+        except Timeout:
+            port_status = {"status": "unhealthy", "message": f"RADIUS server did not respond (timeout) on port {radius_port}"}
+            port_healthy = False
+            
     except Exception as e:
-        port_status = {"status": "unhealthy", "message": f"UDP networking check failed: {str(e)}"}
+        # Traceback can be helpful for debugging dictionary issues in the container
+        port_status = {"status": "unhealthy", "message": f"RADIUS health ping failed: {str(e)}"}
         port_healthy = False
 
     overall_healthy = db_healthy and port_healthy
