@@ -3,7 +3,7 @@ descr: RadMac - Simple Radius MAC Authentication Server
 category: security
 default-credentials: admin:admin
 icon: https://raw.githubusercontent.com/Simon-CR/RadMac/main/logo.png
-url-path: /
+
 auto-update: false
 
 services:
