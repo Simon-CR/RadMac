@@ -29,4 +29,4 @@ COPY . .
 EXPOSE 8080
 
 # Run DB migration before starting the app
-CMD ["/bin/sh", "-c", "python db_migrate.py && gunicorn --bind 0.0.0.0:8080 wsgi:app --timeout 120 --workers 2"]
+CMD ["/bin/bash", "/app/start.sh"]

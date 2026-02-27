@@ -38,7 +38,7 @@ services:
     restart: always
 
   app:
-    image: docker.io/simonclr/radmac-app:latest
+    image: docker.io/simonclr/radmac-app:mikrotik
     container_name: radmac-app
     depends_on:
       - db
