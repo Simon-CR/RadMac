@@ -10,5 +10,5 @@ set -x
 echo "Starting Flask development server (Debugging Gunicorn/App crash)..."
 export FLASK_APP=wsgi:app
 set -e
-echo "Starting Gunicorn server on internal port 8042..."
-exec gunicorn --bind 0.0.0.0:8042 wsgi:app --timeout 120 --workers 2
+echo "Starting Gunicorn server on internal port 80..."
+exec gunicorn --bind 0.0.0.0:80 wsgi:app --timeout 120 --workers 2

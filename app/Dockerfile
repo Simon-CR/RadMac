@@ -26,7 +26,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Expose internal port (Gunicorn default)
-EXPOSE 8042
+EXPOSE 80
 
 # Run DB migration before starting the app
 CMD ["/bin/bash", "/app/start.sh"]

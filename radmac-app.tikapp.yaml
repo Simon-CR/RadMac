@@ -57,7 +57,7 @@ services:
       RADIUS_SECRET: testing123
     restart: unless-stopped
     ports:
-      - 8081:80/tcp:web
+      - 80:80/tcp:web
 
 networks:
   default:
