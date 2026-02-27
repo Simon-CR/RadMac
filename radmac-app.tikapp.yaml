@@ -27,7 +27,7 @@ services:
     depends_on:
       - db
     environment:
-      DB_HOST: 127.0.0.1
+      DB_HOST: "[accessIP]"
       DB_USER: radmac
       DB_PASSWORD: radmac_password
       DB_NAME: radmac
@@ -46,7 +46,7 @@ services:
       FLASK_APP: wsgi:app
       FLASK_ENV: production
       PYTHONPATH: /app
-      DB_HOST: 127.0.0.1
+      DB_HOST: "[accessIP]"
       DB_USER: radmac
       DB_PASSWORD: radmac_password
       DB_NAME: radmac
