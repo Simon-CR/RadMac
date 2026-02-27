@@ -3,7 +3,6 @@ descr: RadMac - Simple Radius MAC Authentication Server
 category: security
 default-credentials: admin:admin
 icon: https://raw.githubusercontent.com/Simon-CR/RadMac/main/logo.png
-
 auto-update: false
 
 services:
@@ -17,6 +16,8 @@ services:
       MARIADB_PASSWORD: radmac_password
       MARIADB_AUTO_UPGRADE: "1"
     restart: unless-stopped
+    volumes:
+      - db-data:/var/lib/mysql
     ports:
       - 3306:3306/tcp:database
       - 8082:8082/tcp:db-health
@@ -56,4 +57,12 @@ services:
       RADIUS_SECRET: testing123
     restart: unless-stopped
     ports:
-      - 8081:8042/tcp:web
+      - 8081:80/tcp:web
+
+networks:
+  default:
+    name: lan
+    external: true
+
+volumes:
+  db-data:
