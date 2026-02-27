@@ -1,59 +1,59 @@
 name: radmac
 descr: RadMac - Simple Radius MAC Authentication Server
-category: security
-default-credentials: admin:admin
-icon: https://raw.githubusercontent.com/Simon-CR/RadMac/main/logo.png
-url-path: /
+category: "security"
+default-credentials: "admin:admin"
+icon: "https://raw.githubusercontent.com/Simon-CR/RadMac/main/logo.png"
+url-path: "/"
 auto-update: false
 
 services:
   db:
-    image: simonclr/radmac-db:latest
-    container_name: radmac-db
+    image: "docker.io/simonclr/radmac-db:latest"
+    container_name: "radmac-db"
     environment:
-      MARIADB_ROOT_PASSWORD: radmac_root_password
-      MARIADB_DATABASE: radmac
-      MARIADB_USER: radmac
-      MARIADB_PASSWORD: radmac_password
-      MARIADB_AUTO_UPGRADE: 1
-    restart: unless-stopped
+      MARIADB_ROOT_PASSWORD: "radmac_root_password"
+      MARIADB_DATABASE: "radmac"
+      MARIADB_USER: "radmac"
+      MARIADB_PASSWORD: "radmac_password"
+      MARIADB_AUTO_UPGRADE: "1"
+    restart: "unless-stopped"
     ports:
-      - 3306:3306/tcp:database
-      - 8082:8082/tcp:db-health
+      - "3306:3306/tcp:database"
+      - "8082:8082/tcp:db-health"
 
   radius:
-    image: simonclr/radmac-radius:latest
-    container_name: radmac-radius
+    image: "docker.io/simonclr/radmac-radius:latest"
+    container_name: "radmac-radius"
     depends_on:
-      - db
+      - "db"
     environment:
-      DB_HOST: 127.0.0.1
-      DB_USER: radmac
-      DB_PASSWORD: radmac_password
-      DB_NAME: radmac
-      RADIUS_SECRET: testing123
+      DB_HOST: "127.0.0.1"
+      DB_USER: "radmac"
+      DB_PASSWORD: "radmac_password"
+      DB_NAME: "radmac"
+      RADIUS_SECRET: "testing123"
     ports:
-      - 1812:1812/udp:radius
-      - 8083:8083/tcp:radius-health
-    restart: always
+      - "1812:1812/udp:radius"
+      - "8083:8083/tcp:radius-health"
+    restart: "always"
 
   app:
-    image: simonclr/radmac-app:latest
-    container_name: radmac-app
+    image: "docker.io/simonclr/radmac-app:latest"
+    container_name: "radmac-app"
     depends_on:
-      - db
+      - "db"
     environment:
-      FLASK_APP: wsgi:app
-      FLASK_ENV: production
-      PYTHONPATH: /app
-      DB_HOST: 127.0.0.1
-      DB_USER: radmac
-      DB_PASSWORD: radmac_password
-      DB_NAME: radmac
-      ADMIN_USERNAME: admin
-      ADMIN_PASSWORD: admin_password
-      RADIUS_SECRET: testing123
-    restart: unless-stopped
+      FLASK_APP: "wsgi:app"
+      FLASK_ENV: "production"
+      PYTHONPATH: "/app"
+      DB_HOST: "127.0.0.1"
+      DB_USER: "radmac"
+      DB_PASSWORD: "radmac_password"
+      DB_NAME: "radmac"
+      ADMIN_USERNAME: "admin"
+      ADMIN_PASSWORD: "admin_password"
+      RADIUS_SECRET: "testing123"
+    restart: "unless-stopped"
     ports:
-      - 8081:8080/tcp:web
+      - "8081:8080/tcp:web"
 
