@@ -1,0 +1,5 @@
+name: testapp
+descr: Test
+services:
+  web:
+    image: docker.io/nginx:alpine
