@@ -19,7 +19,7 @@ COPY . .
 EXPOSE 1812/udp
 
 # Expose health endpoint port
-EXPOSE 8080
+EXPOSE 1812/udp 8083
 
 # Copy supervisord config
 COPY supervisord.conf /etc/supervisord.conf

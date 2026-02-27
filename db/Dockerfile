@@ -18,7 +18,7 @@ RUN chmod +x /usr/local/bin/health_endpoint.py
 RUN chmod +x /usr/local/bin/recovery_script.py
 
 # Expose health monitoring port
-EXPOSE 8080
+EXPOSE 3306 8082
 
 # Use custom entrypoint that starts both MariaDB and health endpoint
 COPY docker-entrypoint-with-health.sh /usr/local/bin/docker-entrypoint-with-health.sh

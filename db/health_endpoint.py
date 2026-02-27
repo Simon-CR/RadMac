@@ -169,9 +169,8 @@ class HealthHandler(http.server.SimpleHTTPRequestHandler):
         pass
 
 if __name__ == '__main__':
-    PORT = 8080
-    Handler = HealthHandler
-    
-    with socketserver.TCPServer(("", PORT), Handler) as httpd:
-        print(f"Health endpoint serving on port {PORT}")
+    PORT = 8082
+    handler = HealthHandler
+    with socketserver.TCPServer(("", PORT), handler) as httpd:
+        print(f"Health check serving at port {PORT}")
         httpd.serve_forever()

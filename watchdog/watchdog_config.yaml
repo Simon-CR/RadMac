@@ -39,12 +39,12 @@ services:
     default_interval: 30
     actions: [log, email, discord, pushbullet, slack, teams, telegram, webhook]  # Add 'restart' for single-host
   database:
-    health_url: http://db:8080/health
+    health_url: http://db:8082/health
     interval_env: WATCHDOG_CHECK_INTERVAL_DATABASE
     default_interval: 30
     actions: [log, recover, email, slack, webhook]  # Add 'restart' for single-host
   radius:
-    health_url: http://radius:8080/health
+    health_url: http://radius:8083/health
     interval_env: WATCHDOG_CHECK_INTERVAL_RADIUS
     default_interval: 30
     actions: [log, telegram, webhook]  # Add 'restart' for single-host

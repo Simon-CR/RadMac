@@ -367,7 +367,8 @@ class RadMacWatchdog:
         try:
             if service_name == 'database':
                 # Use the database health endpoint's recovery feature
-                recovery_url = f"http://db:8080/recover"
+                db_host = "db" # Assuming 'db' is the service name or hostname for the database
+                recovery_url = f"http://{db_host}:8082/recover"
                 response = requests.post(recovery_url, timeout=30)
                 
                 if response.status_code == 200:
