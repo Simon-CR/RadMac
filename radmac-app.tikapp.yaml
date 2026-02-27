@@ -27,7 +27,7 @@ services:
     depends_on:
       - db
     environment:
-      DB_HOST: "[accessIP]"
+      DB_HOST: 127.0.0.1
       DB_USER: radmac
       DB_PASSWORD: radmac_password
       DB_NAME: radmac
@@ -42,11 +42,12 @@ services:
     container_name: radmac-app
     depends_on:
       - db
+    command: /bin/sh -c "sleep 15 && python db_migrate.py && gunicorn --bind 0.0.0.0:8080 wsgi:app --timeout 120 --workers 2"
     environment:
       FLASK_APP: wsgi:app
       FLASK_ENV: production
       PYTHONPATH: /app
-      DB_HOST: "[accessIP]"
+      DB_HOST: 127.0.0.1
       DB_USER: radmac
       DB_PASSWORD: radmac_password
       DB_NAME: radmac
